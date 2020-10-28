@@ -1,4 +1,4 @@
-## ----setup, echo = FALSE, results = "hide"-------------------------------
+## ----setup, echo = FALSE, results = "hide"------------------------------------
 lang_output <- function(x, lang) {
   cat(c(sprintf("```%s", lang), x, "```"), sep = "\n")
 }
@@ -10,17 +10,17 @@ knitr::opts_chunk$set(
   fig.height = 5)
 options(odin.verbose = FALSE)
 
-## ----load_sir------------------------------------------------------------
+## ----load_sir-----------------------------------------------------------------
 path_sir_model <- system.file("examples/discrete_deterministic_sir.R", package = "odin")
 
-## ----echo = FALSE, results = "asis"--------------------------------------
+## ----echo = FALSE, results = "asis"-------------------------------------------
 r_output(readLines(path_sir_model))
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 sir_generator <- odin::odin(path_sir_model)
 sir_generator
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 x <- sir_generator()
 x
 
@@ -33,13 +33,13 @@ matplot(x_res[, 1], x_res[, -1], xlab = "Time", ylab = "Number of individuals",
         type = "l", col = sir_col, lty = 1)
 legend("topright", lwd = 1, col = sir_col, legend = c("S", "I", "R"), bty = "n")
 
-## ----load_sir_s----------------------------------------------------------
+## ----load_sir_s---------------------------------------------------------------
 path_sir_model_s <- system.file("examples/discrete_stochastic_sir.R", package = "odin")
 
-## ----echo = FALSE, results = "asis"--------------------------------------
+## ----echo = FALSE, results = "asis"-------------------------------------------
 r_output(readLines(path_sir_model_s))
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 sir_s_generator <- odin::odin(path_sir_model_s)
 sir_s_generator
 x <- sir_s_generator(I_ini = 10)
@@ -52,13 +52,13 @@ matplot(x_res[, 1], x_res[, -1], xlab = "Time", ylab = "Number of individuals",
         type = "l", col = sir_col, lty = 1)
 legend("topright", lwd = 1, col = sir_col, legend = c("S", "I", "R"), bty = "n")
 
-## ------------------------------------------------------------------------
+## -----------------------------------------------------------------------------
 path_sir_model_s_a <- system.file("examples/discrete_stochastic_sir_arrays.R", package = "odin")
 
-## ----echo = FALSE, results = "asis"--------------------------------------
+## ----echo = FALSE, results = "asis"-------------------------------------------
 r_output(readLines(path_sir_model_s_a))
 
-## ----echo = TRUE---------------------------------------------------------
+## ----echo = TRUE--------------------------------------------------------------
 sir_s_a_generator <- odin::odin(path_sir_model_s_a)
 sir_s_a_generator
 x <- sir_s_a_generator()
@@ -72,13 +72,13 @@ matplot(x_res[, 1], x_res[, -1], xlab = "Time", ylab = "Number of individuals",
         type = "l", col = rep(sir_col_transp, each = 100), lty = 1)
 legend("left", lwd = 1, col = sir_col, legend = c("S", "I", "R"), bty = "n")
 
-## ----load_seirds---------------------------------------------------------
+## ----load_seirds--------------------------------------------------------------
 path_seirds_model <- system.file("examples/discrete_stochastic_seirds.R", package = "odin")
 
-## ----echo = FALSE, results = "asis"--------------------------------------
+## ----echo = FALSE, results = "asis"-------------------------------------------
 r_output(readLines(path_seirds_model))
 
-## ----seirds--------------------------------------------------------------
+## ----seirds-------------------------------------------------------------------
 seirds_generator <- odin::odin(path_seirds_model)
 seirds_generator
 x <- seirds_generator()
@@ -105,7 +105,7 @@ matplot(0:365, x_res, xlab = "Time", ylab = "Number of individuals",
 legend("right", lwd = 1, col = seirds_col,
        legend = c("S", "E", "Ir", "Id", "R", "D"), bty = "n")
 
-## ----custom_function-----------------------------------------------------
+## ----custom_function----------------------------------------------------------
 check_model <- function(n = 50, t = 0:365, alpha = 0.2, ...,
                         legend_pos = "topright") {
   model <- seirds_generator(...)

@@ -140,10 +140,6 @@ generate_c_compiled_create <- function(eqs, dat, rewrite) {
   ## Assign all arrays as NULL, which allows all allocations to be
   ## written as Free/Calloc because Free will not try to free a
   ## pointer that has been set to NULL.
-  ##
-  ## NOTE: previously we ignored user equations here
-  ##   !identical(dat$equations[[x$name]]$type, "user")
-  ## but I don't think that's needed
   null_initial <- names_if(vlapply(dat$data$elements, function(x) {
     (x$rank > 0 && x$location == "internal") ||
       x$storage_type == "ring_buffer"
@@ -260,7 +256,7 @@ generate_c_compiled_deriv_dde <- function(dat) {
   body <- sprintf_safe("%s((%s*)%s, %s, %s, %s, NULL);",
                        dat$meta$c$rhs, dat$meta$c$internal_t,
                        dat$meta$internal, dat$meta$time, dat$meta$state,
-                       dat$meta$result, dat$meta$output)
+                       dat$meta$result)
   c_function("void", dat$meta$c$rhs_dde, args, body)
 }
 
@@ -292,7 +288,7 @@ generate_c_compiled_rhs_r <- function(dat, rewrite) {
     body$add("double *%s = NULL;", dat$meta$output)
   }
 
-  if(dat$features$has_stochastic) {
+  if (dat$features$has_stochastic) {
     body$add("GetRNGstate();")
   }
 
@@ -323,7 +319,7 @@ generate_c_compiled_rhs_r <- function(dat, rewrite) {
     body$add(eval_rhs)
   }
 
-  if(dat$features$has_stochastic) {
+  if (dat$features$has_stochastic) {
     body$add("PutRNGstate();")
   }
 
@@ -604,7 +600,7 @@ generate_c_compiled_metadata <- function(dat, rewrite) {
   body$add('SET_STRING_ELT(nms, 1, mkChar("output_order"));')
   body$add('SET_STRING_ELT(nms, 2, mkChar("n_out"));')
   body$add('SET_STRING_ELT(nms, 3, mkChar("interpolate_t"));')
-  body$add("setAttrib(ret, R_NamesSymbol, nms);");
+  body$add("setAttrib(ret, R_NamesSymbol, nms);")
 
   body$add(len_block(variables, "variable", 0))
 
@@ -633,7 +629,7 @@ generate_c_compiled_metadata <- function(dat, rewrite) {
 
     body$add("SEXP interpolate_t = PROTECT(allocVector(VECSXP, 3));")
     body$add("SEXP interpolate_t_nms = PROTECT(allocVector(STRSXP, 3));")
-    body$add("setAttrib(interpolate_t, R_NamesSymbol, interpolate_t_nms);");
+    body$add("setAttrib(interpolate_t, R_NamesSymbol, interpolate_t_nms);")
     body$add("SET_VECTOR_ELT(interpolate_t, 0, ScalarReal(%s));", args_min)
     body$add("SET_VECTOR_ELT(interpolate_t, 1, ScalarReal(%s));", args_max)
     body$add('SET_STRING_ELT(interpolate_t_nms, 0, mkChar("min"));')
@@ -705,7 +701,7 @@ generate_c_compiled_library <- function(dat, is_package) {
     v <- c(v, "fintdiv")
   }
   if ("sum" %in% used) {
-    v <- c(v, "odin_sum1")
+    v <- c(v, "odin_sum1", "odin_isum1")
   }
 
   if ("odin_sum" %in% used) {
@@ -726,6 +722,10 @@ generate_c_compiled_library <- function(dat, is_package) {
           paste0(x$definition, "\n", collapse = "")), nms))
       lib <- join_library(list(lib, extra_lib))
     }
+  }
+
+  if ("rmhyper" %in% used) {
+    v <- c(v, "rmhyper", "rmhyper_i", "rmhyper_d")
   }
 
   v <- unique(v)

@@ -17,6 +17,7 @@ odin_base_env <- function() {
   for (i in imports) {
     env[[i]] <- stats[[i]]
   }
+  env[["rmhyper"]] <- rmhyper
 
   env
 }
@@ -130,7 +131,7 @@ support_check_interpolate_t <- function(time, dat, tcrit) {
                  dat$max), call. = FALSE)
   }
   if (length(dat$max) > 0L && is.null(tcrit)) {
-    ## min(dat$max, tcrit) # TODO: breaks tests, but better behaviour
+    ## > min(dat$max, tcrit) # TODO: breaks tests, but better behaviour
     dat$max
   } else {
     tcrit

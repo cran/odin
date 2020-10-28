@@ -28,16 +28,23 @@ generate_c_sexp <- function(x, data, meta, supported) {
       ret <- generate_c_sexp(data$elements[[args[[1L]]]]$dimnames$length,
                              data, meta, supported)
     } else if (fn == "dim") {
+      args[[1]] <- sub(sprintf("^%s->", INTERNAL), "", args[[1]])
       dim <- data$elements[[args[[1L]]]]$dimnames$dim[[args[[2]]]]
       ret <- generate_c_sexp(dim, data, meta, supported)
     } else if (fn %in% c("norm_rand", "unif_rand", "exp_rand")) {
       ret <- sprintf("%s(%s)", fn, paste(values, collapse = ", "))
     } else if (fn == "log" && length(values) == 2L) {
       ret <- sprintf("(log(%s) / log(%s))", values[[1L]], values[[2L]])
+    } else if (fn == "round") {
+      ## ensures same rounding behaviour of 0.5 as R:
+      digits <- if (length(values) == 2L) values[[2L]] else 0
+      ret <- sprintf("fround(%s, %s)", values[[1L]], digits)
     } else if (fn == "min" || fn == "max") {
       ret <- c_fold_call(paste0("f", fn), values)
     } else if (fn == "sum" || fn == "odin_sum") {
       ret <- generate_c_sexp_sum(args, data, meta, supported)
+    } else if (fn == "as.integer") {
+      ret <- sprintf("(int) (%s)", values[[1L]])
     } else {
       if (fn == "rbinom") {
         ## This is a little extreme but is useful in at least some
@@ -73,11 +80,16 @@ generate_c_sexp <- function(x, data, meta, supported) {
 
 generate_c_sexp_sum <- function(args, data, meta, supported) {
   target <- generate_c_sexp(args[[1]], data, meta, supported)
-  data_info <- data$elements[[args[[1]]]]
+  data_info <- data$elements[[sub(sprintf("^%s->", INTERNAL), "", args[[1]])]]
+  type <- data_info$storage_type
   if (length(args) == 1L) {
+    fn <- if (type == "int") "odin_isum1" else "odin_sum1"
     len <- generate_c_sexp(data_info$dimnames$length, data, meta, supported)
-    sprintf("odin_sum1(%s, 0, %s)", target, len)
+    sprintf("%s(%s, 0, %s)", fn, target, len)
   } else {
+    if (type == "int") {
+      stop("Partial integer sums not yet supported")
+    }
     i <- seq(2, length(args), by = 2)
 
     all_args <- c(args, as.list(data_info$dimnames$mult[-1]))

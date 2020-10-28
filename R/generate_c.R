@@ -146,7 +146,7 @@ generate_c_r <- function(dat, core, package) {
   core_str <- as_str(sprintf(
     '%s = "%s"', names(core), list_to_character(core)))
   features_str <- as_str(sprintf(
-    '%s = %s', names(dat$features), vlapply(dat$features, identity)))
+    "%s = %s", names(dat$features), vlapply(dat$features, identity)))
 
   ## TODO:
   ## nicer would be to:
@@ -166,7 +166,7 @@ generate_c_r <- function(dat, core, package) {
           class_name, base, core_str, user_str, features_str, package, dat$ir)
 
   ctor <- generate_r_constructor(class_name, dat$features$discrete, dat$user,
-                                 dat$ir, NULL)
+                                 dat$ir, emptyenv())
   ctor <- sub("\\s+$", "", deparse(ctor))
   ctor[[1]] <- sprintf("%s <- %s", base, ctor[[1]])
   ret$add(ctor)

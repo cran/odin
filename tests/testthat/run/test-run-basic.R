@@ -145,6 +145,19 @@ test_that("user variables", {
 })
 
 
+
+test_that("simple operations in user variables are allowed", {
+  gen <- odin({
+    deriv(x) <- 1
+    initial(x) <- x0
+    x0 <- user(-1 / (2 + 3 * 4))
+  })
+
+  mod <- gen()
+  expect_equal(mod$contents()$x0, -1 / (2 + 3 * 4))
+})
+
+
 ## Tests: basic output
 ##
 ## This one is about as basic as I can see!
@@ -504,7 +517,6 @@ test_that("multiple arrays: constant", {
   })
 
   mod <- gen()
-  ## expect_equal(mod$contents()$offset_y, 3)
   expect_equal(mod$initial(0), rep(1:2, each = 3))
   expect_equal(mod$deriv(0, mod$initial(0)), rep(1:3, 2))
 })
@@ -524,7 +536,6 @@ test_that("multiple arrays: dynamic", {
   })
 
   mod <- gen(4)
-  ## expect_equal(mod$contents()$offset_y, 4)
   expect_equal(mod$initial(0), rep(1:2, each = 4))
   expect_equal(mod$deriv(0, mod$initial(0)), rep(1:4, 2))
 })
@@ -648,7 +659,7 @@ test_that("discrete delays: matrix", {
   tt <- 0:10
   yy <- mod$run(tt)
   zz <- mod$transform_variables(yy)
-  expect_equal(zz$z[1:3, ,], array(1, c(3, 2, 3)))
+  expect_equal(zz$z[1:3, , ], array(1, c(3, 2, 3)))
   expect_equal(zz$z[4:11, , ], zz$y[1:8, , ])
 })
 
@@ -681,14 +692,14 @@ test_that("multinomial", {
 
 test_that("local scope of loop variables", {
   gen <- odin({
-    deriv(x[1,]) <- 1
-    deriv(x[2:n,]) <- 2
+    deriv(x[1, ]) <- 1
+    deriv(x[2:n, ]) <- 2
 
-    deriv(y[1,]) <- 2
-    deriv(y[2:n,]) <- 4
+    deriv(y[1, ]) <- 2
+    deriv(y[2:n, ]) <- 4
 
-    initial(x[,]) <- 1
-    initial(y[,]) <- 1
+    initial(x[, ]) <- 1
+    initial(y[, ]) <- 1
 
     dim(x) <- c(n, m)
     dim(y) <- c(n, m)

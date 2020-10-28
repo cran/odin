@@ -1,6 +1,7 @@
 context("package")
 
 test_that("generate package", {
+  skip_on_windows_gha()
   files <- sprintf("examples/%s_odin.R", ODIN_TO_TEST[1:2])
   res <- odin_create_package("example", files)
   on.exit(res$cleanup())
@@ -28,6 +29,7 @@ test_that("generate package", {
 })
 
 test_that("interpolation", {
+  skip_on_windows_gha()
   res <- odin_create_package("interpolation", "examples/interpolate_odin.R")
   on.exit(res$cleanup())
 
@@ -59,6 +61,7 @@ test_that("interpolation", {
 
 
 test_that("ring", {
+  skip_on_windows_gha()
   path <- "pkg/inst/odin/discretedelay.R"
   res <- odin_create_package("discretedelay", path)
   on.exit(res$cleanup())
@@ -71,6 +74,7 @@ test_that("ring", {
 
 
 test_that("user_c", {
+  skip_on_windows_gha()
   path <- c("pkg/inst/odin/pulse.R", "user_fns.c")
   res <- odin_create_package("pulse", path)
   on.exit(res$cleanup())
@@ -124,6 +128,7 @@ test_that("error cases", {
 ## Same as the example:
 test_that("example package", {
   skip_on_cran()
+  skip_on_windows_gha()
   path <- tempfile()
   dir.create(path)
 
@@ -139,5 +144,33 @@ test_that("example package", {
   mod <- res$env$lorenz()
   expect_equal(mod$initial(0), c(10, 1, 1))
   expect_equal(mod$deriv(0, c(10, 1, 1)),
-               c(-90, 269, 22/3))
+               c(-90, 269, 22 / 3))
+})
+
+
+test_that("two sums example", {
+  skip_on_cran()
+  skip_on_windows_gha()
+
+  path <- tempfile()
+  dir.create(path)
+
+  src <- system.file("examples/package", package = "odin", mustWork = TRUE)
+  file.copy(src, path, recursive = TRUE)
+  pkg <- file.path(path, "package")
+
+  code <- c("deriv(x) <- sum(y[1, , ])",
+            "initial(x) <- 0",
+            "y[, , ] <- 1",
+            "dim(y) <- c(2, 3, 4)")
+  writeLines(code, file.path(pkg, "inst/odin/z.R"))
+
+  odin_package(pkg)
+  res <- build_package(pkg)
+  on.exit(res$cleanup())
+
+  expect_is(res$env$z, "odin_generator")
+  mod <- res$env$z()
+  expect_equal(mod$initial(0), 0)
+  expect_equal(mod$deriv(0, 0), 12)
 })

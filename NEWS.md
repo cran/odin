@@ -1,3 +1,20 @@
+# odin 1.0.7
+
+* Support for `as.integer()` to cast to integer for use within array expressions (#200)
+
+# odin 1.0.6
+
+* Fixed bug in code generation for initial conditions involving sums of matrices (#196)
+
+# odin 1.0.3
+
+* Support for multivariate hypergeometric function via the odin function `rmhyper()` - there is no analogue for this in base R. Like `rmultinom` this returns a vector and the interface is subject to possible change (`mrc-1621`)
+* New vignette `functions`, which briefly describes all supported odin functions (`mrc-1623`)
+
+# odin 1.0.2
+
+* Support for 2-argument round (e.g., `round(1.23, 1)` is 1.2), and enforce the same 0.5 rounding behaviour as R when used from C (`mrc-511`, #116, #179)
+
 # odin 1.0.0
 
 * Initial release to CRAN
