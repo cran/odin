@@ -1,6 +1,6 @@
 Package: odin
 Title: ODE Generation and Integration
-Version: 1.0.8
+Version: 1.2.0
 Authors@R: c(person("Rich", "FitzJohn", role = c("aut", "cre"),
                     email = "rich.fitzjohn@gmail.com"),
              person("Thibaut", "Jombart", role = "ctb"),
@@ -24,22 +24,21 @@ Description: Generate systems of ordinary differential equations
     functions during interpolation, and for integrating quantities
     that represent arrays.
 License: MIT + file LICENSE
-LazyData: true
 URL: https://github.com/mrc-ide/odin
 BugReports: https://github.com/mrc-ide/odin/issues
-Imports: R6, cinterpolate (>= 1.0.0), crayon, deSolve, digest,
-        jsonlite, ring
-Suggests: dde (>= 1.0.0), jsonvalidate (>= 1.1.0), knitr, rmarkdown,
-        testthat
+Imports: R6, cinterpolate (>= 1.0.0), deSolve, digest, glue, jsonlite,
+        ring, withr
+Suggests: dde (>= 1.0.0), jsonvalidate (>= 1.1.0), knitr, mockery,
+        pkgbuild, pkgload, rlang, rmarkdown, testthat
 VignetteBuilder: knitr
-RoxygenNote: 6.1.1
+RoxygenNote: 7.1.1
 Encoding: UTF-8
 Language: en-GB
 NeedsCompilation: no
-Packaged: 2020-10-28 13:51:02 UTC; rfitzjoh
+Packaged: 2021-07-07 07:24:32 UTC; rfitzjoh
 Author: Rich FitzJohn [aut, cre],
   Thibaut Jombart [ctb],
   Imperial College of Science, Technology and Medicine [cph]
 Maintainer: Rich FitzJohn <rich.fitzjohn@gmail.com>
 Repository: CRAN
-Date/Publication: 2020-10-28 15:00:06 UTC
+Date/Publication: 2021-07-07 09:20:02 UTC

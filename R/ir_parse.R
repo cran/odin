@@ -9,14 +9,24 @@ ir_parse <- function(x, options, type = NULL) {
   source <- dat$source
 
   ## Data elements:
-  config <- ir_parse_config(eqs, base, root, source)
+  config <- ir_parse_config(eqs, base, root, source, options$read_include,
+                            options$config_custom)
   features <- ir_parse_features(eqs, config, source)
 
   variables <- ir_parse_find_variables(eqs, features$discrete, source)
 
   eqs <- lapply(eqs, ir_parse_rewrite_initial, variables)
+  eqs <- ir_parse_arrays(eqs, variables, config$include$names, source)
 
-  eqs <- ir_parse_arrays(eqs, variables, source)
+  ## This performs a round of optimisation where we try to simplify
+  ## away expressions for the dimensions, which reduces the number of
+  ## required variables.
+  eqs <- ir_parse_substitute(eqs, options$substitutions)
+  if (options$rewrite_constants) {
+    eqs <- ir_parse_rewrite_constants(eqs)
+  } else if (options$rewrite_dims && features$has_array) {
+    eqs <- ir_parse_rewrite_dims(eqs)
+  }
 
   packing <- ir_parse_packing(eqs, variables, source)
   eqs <- c(eqs, packing$offsets)
@@ -40,8 +50,6 @@ ir_parse <- function(x, options, type = NULL) {
   }
 
   eqs <- eqs[order(names(eqs))]
-
-  ir_parse_arrays_check_naked_index(eqs, options$no_check_naked_index, source)
 
   meta <- ir_parse_meta(features$discrete)
 
@@ -74,7 +82,7 @@ ir_parse <- function(x, options, type = NULL) {
   equations <- ir_parse_equations(eqs)
 
   ## TODO: it's a bit unclear where this best belongs
-  ir_parse_check_functions(eqs, features$discrete, config$include, source)
+  ir_parse_check_functions(eqs, features$discrete, config$include$names, source)
 
   ret <- list(version = .odin$version,
               config = config,
@@ -148,8 +156,10 @@ ir_parse_data_element <- function(x, stage) {
     dimnames <- x$array$dimnames
   }
 
+  stage <- stage[[x$name]]
+
   if (is.null(x$lhs$special)) {
-    if (rank == 0L && stage[[x$name]] == STAGE_TIME) {
+    if (rank == 0L && stage == STAGE_TIME) {
       location <- "transient"
     } else {
       location <- "internal"
@@ -167,6 +177,7 @@ ir_parse_data_element <- function(x, stage) {
 
   list(name = name,
        location = location,
+       stage = stage,
        storage_type = storage_type,
        rank = rank,
        dimnames = dimnames)
@@ -316,13 +327,18 @@ ir_parse_stage <- function(eqs, dependencies, variables, time_name, source) {
   stage[names_if(vlapply(eqs, is_null))] <- STAGE_NULL
 
   i <- vlapply(eqs, function(x) !is.null(x$array))
-  len <- unique(vcapply(eqs[i], function(x) x$array$dimnames$length))
-  err <- stage[len] == STAGE_TIME
+  len <- lapply(eqs[i], function(x) x$array$dimnames$length)
+  ## We end up with sometimes a string and sometimes a symbol here
+  ## which is unsatisfactory.
+  len_var <- vcapply(len[!vlapply(len, is.numeric)], as.character)
+  err <- stage[len_var] == STAGE_TIME
 
   if (any(err)) {
+    ## TODO: in the case where we rewrite dimensions this error is not
+    ## great beause we've lost the dim() call!
     ir_parse_error(
       "Array extent is determined by time",
-      ir_parse_error_lines(eqs[len[err]]), source)
+      ir_parse_error_lines(eqs[len_var[err]]), source)
   }
 
   stage
@@ -340,8 +356,11 @@ ir_parse_packing_new <- function(eqs, variables, offset_prefix) {
 
 ir_parse_packing_internal <- function(names, rank, len, variables,
                                       offset_prefix) {
-  ## We'll pack from least to most complex:
-  i <- order(rank)
+  ## We'll pack from least to most complex and everything with a fixed
+  ## offset first. This puts all scalars first, then all arrays that
+  ## have compile-time size next (in order of rank), then all arrays
+  ## with user-time size (in order of rank).
+  i <- order(!vlapply(len, is.numeric), rank)
   names <- names[i]
   rank <- rank[i]
   len <- len[i]
@@ -353,10 +372,9 @@ ir_parse_packing_internal <- function(names, rank, len, variables,
   for (i in seq_along(names)) {
     if (!is_array[[i]]) {
       offset[[i + 1L]] <- i
-    } else if (identical(offset[[i]], 0L)) {
-      offset[[i + 1L]] <- as.name(len[[i]])
     } else {
-      offset[[i + 1L]] <- call("+", offset[[i]], as.name(len[[i]]))
+      len_i <- if (is.numeric(len[[i]])) len[[i]] else as.name(len[[i]])
+      offset[[i + 1L]] <- static_eval(call("+", offset[[i]], len_i))
     }
   }
 
@@ -472,21 +490,7 @@ ir_parse_components <- function(eqs, dependencies, variables, stage,
   core <- c(core, names(eqs)[type %in% ignore])
 
   if (!options$no_check_unused_equations) {
-    used <- unique(c(core, unlist(dependencies[core], FALSE, FALSE)))
-    check <- names_if(vlapply(eqs, function(x) !isTRUE(x$implicit)))
-    unused <- setdiff(check, used)
-
-    if (length(unused) > 0L) {
-      ## NOTE: at this point it would be nicest to unravel the
-      ## dependency graph a bit to find the variables that are really
-      ## never used; these are the ones that that the others come from.
-      ## But at this point all of these can be ripped out so we'll just
-      ## report them all:
-      what <- ngettext(length(unused), "equation", "equations")
-      ir_parse_note(sprintf("Unused %s: %s",
-                            what, paste(sort(unused), collapse = ", ")),
-                    ir_parse_error_lines(eqs[unused]), source)
-    }
+    ir_parse_check_unused(eqs, dependencies, core, stage, source)
   }
 
   list(
@@ -495,6 +499,46 @@ ir_parse_components <- function(eqs, dependencies, variables, stage,
     initial = list(variables = character(0), equations = eqs_initial),
     rhs = list(variables = variables_rhs, equations = eqs_rhs),
     output = list(variables = variables_output, equations = eqs_output))
+}
+
+
+ir_parse_check_unused <- function(eqs, dependencies, core, stage, source) {
+  used <- unique(c(core, unlist(dependencies[core], FALSE, FALSE)))
+  check <- names_if(vlapply(eqs, function(x) !isTRUE(x$implicit)))
+  unused <- setdiff(check, used)
+
+  ## Check to make sure that we don't mark equations as
+  ## ignorable. Practically this will just be for user and constant
+  ## variables as missing time-varying variables will be excluded
+  ## due to not contributing to the graph.
+  ignored <- vlapply(eqs[unused], function(x)
+    any(grepl("#\\s*ignore\\.unused", source[x$source])),
+    USE.NAMES = FALSE)
+
+  ## This is almost certainly not what is wanted, but for now we'll
+  ## just raise a message rather than an error:
+  if (length(ignored) > 0) {
+    dropped <- names_if(stage[unused[ignored]] == STAGE_TIME)
+    if (length(dropped) > 0) {
+      ir_parse_note(sprintf(
+        "Unused equation marked as ignored will be dropped: %s",
+        paste(sort(dropped), collapse = ", ")),
+        ir_parse_error_lines(eqs[dropped]), source)
+    }
+  }
+
+  unused <- unused[!ignored]
+  if (length(unused) > 0L) {
+    ## NOTE: at this point it would be nicest to unravel the
+    ## dependency graph a bit to find the variables that are really
+    ## never used; these are the ones that that the others come from.
+    ## But at this point all of these can be ripped out so we'll just
+    ## report them all:
+    what <- ngettext(length(unused), "equation", "equations")
+    ir_parse_note(sprintf("Unused %s: %s",
+                          what, paste(sort(unused), collapse = ", ")),
+                  ir_parse_error_lines(eqs[unused]), source)
+  }
 }
 
 
@@ -580,8 +624,16 @@ ir_parse_expr <- function(expr, line, source) {
   }
 
   if (identical(lhs$special, "output")) {
-    is_copy <-
-      isTRUE(rhs$rhs$value) || identical(rhs$rhs$value, as.name(lhs$name_data))
+    copy_expr <- as.name(lhs$name_data)
+    if (type == "expression_array") {
+      copy_expr_index <- lapply(INDEX[seq_along(lhs$index)[[1]]], as.name)
+      copy_expr_array <- as.call(c(as.name("["), copy_expr, copy_expr_index))
+    } else {
+      copy_expr_array <- copy_expr
+    }
+    is_copy <- isTRUE(rhs$rhs$value) ||
+      identical(rhs$rhs$value, copy_expr) ||
+      identical(rhs$rhs$value, copy_expr_array)
     if (is_copy) {
       type <- "copy"
       depends <- list(functions = character(0), variables = lhs$name_data)
@@ -777,7 +829,7 @@ ir_parse_expr_check_lhs_name <- function(lhs, special, line, source) {
   name <- deparse(lhs)
 
   if (name %in% RESERVED) {
-    ir_parse_error("Reserved name for lhs", line, source)
+    ir_parse_error(sprintf("Reserved name '%s' for lhs", name), line, source)
   }
   re <- sprintf("^(%s)_.*", paste(RESERVED_PREFIX, collapse = "|"))
   if (grepl(re, name)) {
@@ -1129,7 +1181,7 @@ ir_parse_check_functions <- function(eqs, discrete, include, source) {
                names(FUNCTIONS_UNARY),
                names(FUNCTIONS_RENAME),
                "odin_sum",
-               names(include),
+               include,
                if (discrete) names(FUNCTIONS_STOCHASTIC))
 
   err <- setdiff(all_used_functions, allowed)
@@ -1162,10 +1214,11 @@ ir_parse_delay <- function(eqs, discrete, variables, source) {
       ## TODO: ideally we'd get the correct lines here for source, but
       ## that's low down the list of needs.
       f <- function(x) {
+        depends <- if (is.numeric(x$dim)) character(0) else as.character(x$dim)
         list(name = x$to,
              type = "alloc",
              source = integer(0),
-             depends = ir_parse_depends(variables = x$dim),
+             depends = ir_parse_depends(variables = depends),
              lhs = list(name_data = x$to,
                         name_lhs = x$to,
                         name_equation = x$to),
@@ -1194,8 +1247,11 @@ ir_parse_delay_discrete <- function(eq, eqs, source) {
   nm <- eq$name
   nm_ring <- sprintf("delay_ring_%s", nm)
 
-  depends_ring <- list(functions = character(0),
-                       variables = eq$array$dimnames$length %||% character(0))
+  len <- eq$array$dimnames$length
+  depends_ring <- list(
+    functions = character(0),
+    variables = if (is.character(len)) len else character(0))
+
   lhs_ring <- list(name_data = nm_ring, name_equation = nm_ring,
                    name_lhs = nm_ring, storage_type = "ring_buffer")
   eq_ring <- list(
@@ -1251,19 +1307,27 @@ ir_parse_delay_continuous <- function(eq, eqs, variables, source) {
     substitutions <- list()
   }
 
-  eq_len <- list(
-    name = nm_dim,
-    type = "expression_scalar",
-    source = eq$source,
-    depends = find_symbols(graph$packing$length),
-    lhs = list(name_data = nm_dim, name_equation = nm_dim, name_lhs = nm_dim,
-               storage_type = "int"),
-    rhs = list(value = graph$packing$length))
+  if (is.numeric(graph$packing$length)) {
+    eq_len <- NULL
+    val_len <- graph$packing$length
+    dep_len <- character(0)
+  } else {
+    eq_len <- list(
+      name = nm_dim,
+      type = "expression_scalar",
+      source = eq$source,
+      depends = find_symbols(graph$packing$length),
+      lhs = list(name_data = nm_dim, name_equation = nm_dim, name_lhs = nm_dim,
+                 storage_type = "int"),
+      rhs = list(value = graph$packing$length))
+    val_len <- nm_dim
+    dep_len <- nm_dim
+  }
 
   lhs_use <- eq$lhs[c("name_data", "name_equation", "name_lhs", "special")]
   subs_from <- vcapply(substitutions, "[[", "to")
   depends_use <- join_deps(list(
-    eq$depends, ir_parse_depends(variables = c(nm_dim, subs_from, TIME))))
+    eq$depends, ir_parse_depends(variables = c(dep_len, subs_from, TIME))))
 
   eq_use <- list(
     name = nm,
@@ -1276,7 +1340,7 @@ ir_parse_delay_continuous <- function(eq, eqs, variables, source) {
       state = nm_state,
       index = nm_index,
       substitutions = substitutions,
-      variables = list(length = eq_len$name,
+      variables = list(length = val_len,
                        contents = graph$packing$contents),
       equations = graph$equations,
       default = eq$delay$default,
@@ -1284,7 +1348,7 @@ ir_parse_delay_continuous <- function(eq, eqs, variables, source) {
       depends = eq$delay$depends),
     array = eq$array)
 
-  array <- list(dimnames = list(length = nm_dim, dim = NULL, mult = NULL),
+  array <- list(dimnames = list(length = val_len, dim = NULL, mult = NULL),
                 rank = 1L)
   lhs_index <-
     list(name_data = nm_index, name_equation = nm_index, name_lhs = nm_index,
@@ -1294,7 +1358,7 @@ ir_parse_delay_continuous <- function(eq, eqs, variables, source) {
   offsets <- lapply(variables$contents[match(graph$variables, variable_names)],
                     "[[", "offset")
   depends_index <- join_deps(lapply(offsets, find_symbols))
-  depends_index$variables <- union(depends_index$variables, nm_dim)
+  depends_index$variables <- union(depends_index$variables, dep_len)
   eq_index <- list(
     name = nm_index,
     type = "delay_index",
@@ -1311,7 +1375,7 @@ ir_parse_delay_continuous <- function(eq, eqs, variables, source) {
     name = nm_state,
     type = "null",
     source = eq$source,
-    depends = ir_parse_depends(variables = nm_dim),
+    depends = ir_parse_depends(variables = dep_len),
     lhs = lhs_state,
     array = array)
 
@@ -1320,7 +1384,9 @@ ir_parse_delay_continuous <- function(eq, eqs, variables, source) {
     eq_index$depends$variables <- c(eq_index$depends$variables, names(offsets))
   }
 
-  extra <- c(list(eq_len, eq_index, eq_state, eq_use), offsets)
+  extra <- c(if (is.null(eq_len)) NULL else list(eq_len),
+             list(eq_index, eq_state, eq_use),
+             offsets)
   names(extra) <- vcapply(extra, "[[", "name")
 
   stopifnot(sum(names(eqs) == eq$name) == 1)
@@ -1461,4 +1527,180 @@ ir_parse_expr_rhs_check_inplace <- function(lhs, rhs, line, source) {
       "Expected an array on the lhs of inplace function '%s'", fn),
       line, source)
   }
+}
+
+
+ir_parse_substitute <- function(eqs, subs) {
+  if (is.null(subs)) {
+    return(eqs)
+  }
+
+  f <- function(nm) {
+    eq <- eqs[[nm]]
+    if (is.null(eq)) {
+      stop(sprintf("Substitution failed: '%s' is not an equation", nm),
+           call. = FALSE)
+    }
+    if (eq$type != "user") {
+      stop(sprintf("Substitution failed: '%s' is not a user() equation", nm),
+           call. = FALSE)
+    }
+    if (!is.null(eq$array)) {
+      stop(sprintf("Substitution failed: '%s' is an array", nm), call. = FALSE)
+    }
+    value <- support_coerce_mode(subs[[nm]], eq$user$integer,
+                                 eq$user$min, eq$user$max, nm)
+
+    eq$type <- "expression_scalar"
+    eq$rhs <- list(value = value)
+    eq$stochastic <- FALSE
+    eq
+  }
+
+  eqs[names(subs)] <- lapply(names(subs), f)
+  eqs
+}
+
+
+ir_parse_rewrite_dims <- function(eqs) {
+  nms <- names_if(vlapply(eqs, function(x) isTRUE(x$lhs$dim)))
+  ir_parse_rewrite(nms, eqs)
+}
+
+
+ir_parse_rewrite_constants <- function(eqs) {
+  nms <- names_if(vlapply(eqs, function(x) x$type == "expression_scalar"))
+  ir_parse_rewrite(nms, eqs)
+}
+
+
+ir_parse_rewrite_compute_eqs <- function(nms, eqs) {
+  cache <- new_empty_env()
+  lapply(eqs[nms], function(eq)
+    static_eval(ir_parse_rewrite_compute(eq$rhs$value, eqs, cache)))
+}
+
+
+ir_parse_rewrite_compute <- function(x, eqs, cache) {
+  key <- deparse_str(x)
+  if (key %in% names(cache)) {
+    return(cache[[key]])
+  }
+
+  if (!is.numeric(x)) {
+    if (is.symbol(x)) {
+      x_eq <- eqs[[deparse_str(x)]]
+      ## use identical() here to cope with x_eq being NULL when 't' is
+      ## passed through (that will be an error elsewhere).
+      if (identical(x_eq$type, "expression_scalar")) {
+        x <- ir_parse_rewrite_compute(x_eq$rhs$value, eqs, cache)
+      }
+    } else if (is_call(x, "length")) {
+      ## NOTE: use array_dim_name because we might hit things like
+      ## length(y) where 'y' is one of the variables; we can't look up
+      ## eqs[[name]]$array$length without checking that.
+      length_name <- as.name(array_dim_name(as.character(x[[2]])))
+      x <- ir_parse_rewrite_compute(length_name, eqs, cache)
+    } else if (is_call(x, "dim")) {
+      dim_name <- as.name(array_dim_name(as.character(x[[2]]), x[[3]]))
+      x <- ir_parse_rewrite_compute(dim_name, eqs, cache)
+    } else if (is.recursive(x)) {
+      x[-1] <- lapply(x[-1], ir_parse_rewrite_compute, eqs, cache)
+    }
+  }
+
+  cache[[key]] <- x
+  x
+}
+
+
+ir_parse_rewrite <- function(nms, eqs) {
+  val <- tryCatch(
+    ir_parse_rewrite_compute_eqs(nms, eqs),
+    error = function(e) {
+      message("Rewrite failure: ", e$message)
+      list()
+    })
+
+  rewrite <- vlapply(val, function(x) is.symbol(x) || is.numeric(x))
+
+  subs <- val[rewrite]
+
+  ## One small wrinkle here: don't rewrite things that are the target
+  ## of a copy as the rewrite is complicated. This affects almost
+  ## nothing in reality outside the tests?
+  copy_self <- unlist(lapply(eqs, function(x)
+    if (x$type == "copy") x$lhs$name_data), FALSE)
+  subs <- subs[setdiff(names(subs), copy_self)]
+
+  is_dim <- vlapply(eqs, function(x) isTRUE(x$lhs$dim))
+
+  ## Try and deduplicate the rest. However, it's not totally obvious
+  ## that we can do this without creating some weird dependency
+  ## issues. Also we need to only treat dimensions (and possibly
+  ## offsets); we could do any compile-time thing really but we don't
+  ## know it yet. Propagating other expressions through though can
+  ## create problems.
+  check <- val[intersect(names_if(!rewrite), names_if(is_dim))]
+
+  if (length(check) > 0) {
+    dup <- duplicated(check) & !vlapply(check, is.null)
+    if (any(dup)) {
+      i <- match(check[dup], check)
+      subs <- c(subs,
+                set_names(lapply(names(check)[i], as.name), names(check)[dup]))
+    }
+  }
+
+  subs_env <- list2env(subs, parent = emptyenv())
+  subs_dep <- vcapply(subs, function(x)
+    if (is.numeric(x)) NA_character_ else deparse_str(x))
+
+  replace <- function(x, y) {
+    i <- match(vcapply(x, function(x) x %||% ""), names(y))
+    j <- which(!is.na(i))
+    x[j] <- unname(y)[i[j]]
+    na_drop(x)
+  }
+
+  rewrite_eq_array_part <- function(el) {
+    el$value <- substitute_(el$value, subs_env)
+    for (i in seq_along(el$index)) {
+      el$index[[i]]$value <- substitute_(el$index[[i]]$value, subs_env)
+    }
+    el
+  }
+
+  rewrite_eq <- function(eq) {
+    if (eq$type == "expression_array") {
+      eq$rhs <- lapply(eq$rhs, rewrite_eq_array_part)
+    } else if (eq$name %in% names(subs)) {
+      eq$rhs$value <- subs[[eq$name]]
+    } else {
+      eq$rhs$value <- substitute_(eq$rhs$value, subs_env)
+    }
+
+    eq$depends$variables <- replace(eq$depends$variables, subs_dep)
+    eq$lhs$depends$variables <- replace(eq$lhs$depends$variables, subs_dep)
+
+    if (!is.null(eq$array$dimnames)) {
+      eq$array$dimnames$length <- replace(eq$array$dimnames$length, subs)[[1]]
+      eq$array$dimnames$dim <- replace(eq$array$dimnames$dim, subs)
+      eq$array$dimnames$mult <- replace(eq$array$dimnames$mult, subs)
+    }
+
+    if (!is.null(eq$delay)) {
+      eq$delay$time <- substitute_(eq$delay$time, subs_env)
+      eq$delay$depends$variables <-
+        replace(eq$delay$depends$variables, subs_dep)
+    }
+
+    eq
+  }
+
+  ## Can't drop initial(), deriv(), or update() calls even if they are
+  ## constants.
+  keep <- names_if(!vlapply(eqs, function(x) is.null(x$lhs$special)))
+  i <- setdiff(names(eqs), setdiff(names(subs), keep))
+  lapply(eqs[i], rewrite_eq)
 }

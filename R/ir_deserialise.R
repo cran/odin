@@ -7,7 +7,7 @@
 ##' @title Deserialise odin's IR
 ##' @param x An intermediate representation as a json string
 ##' @return A named list
-##' @seealso \code{\link{odin_parse}}
+##' @seealso [odin::odin_parse]
 ##' @export
 ##' @examples
 ##' # Parse a model of exponential decay
@@ -30,10 +30,6 @@ ir_deserialise <- function(ir) {
   dat$version <- numeric_version(dat$version)
   dat$components <- lapply(dat$components, lapply, list_to_character)
 
-  if (dat$features$has_array) {
-    dat$data$elements <- lapply(dat$data$elements, ir_deserialise_data_dimnames)
-  }
-
   names(dat$data$elements) <- vcapply(dat$data$elements, "[[", "name")
   names(dat$data$variable$contents) <-
     vcapply(dat$data$variable$contents, "[[", "name")
@@ -41,8 +37,6 @@ ir_deserialise <- function(ir) {
     vcapply(dat$data$output$contents, "[[", "name")
   names(dat$equations) <- vcapply(dat$equations, "[[", "name")
   names(dat$user) <- vcapply(dat$user, "[[", "name")
-
-  names(dat$config$include) <- vcapply(dat$config$include, "[[", "name")
 
   dat$interpolate <- lapply(dat$interpolate, list_to_character)
   dat$equations <- lapply(dat$equations, ir_deserialise_equation)
@@ -66,13 +60,4 @@ ir_deserialise_equation <- function(eq) {
         vcapply(eq$delay$substitutions, "[[", "from"))
   }
   eq
-}
-
-
-ir_deserialise_data_dimnames <- function(x) {
-  if (x$rank > 0L) {
-    v <- c("dim", "mult")
-    x$dimnames[v] <- lapply(x$dimnames[v], list_to_character)
-  }
-  x
 }

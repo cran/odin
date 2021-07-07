@@ -1,4 +1,5 @@
 AppVeyor
+CodeFactor
 Deserialise
 Dormand
 FitzJohn
@@ -28,6 +29,7 @@ dR
 dS
 dde
 deSolve
+debuggable
 deserialisation
 dt
 etc
@@ -40,7 +42,10 @@ json
 knitr
 lorenz
 mathcal
+mrc
 odin's
+pkgbuild
+proc
 rightarrow
 rmarkdown
 roxygen

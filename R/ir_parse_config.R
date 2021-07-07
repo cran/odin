@@ -1,14 +1,21 @@
-ir_parse_config <- function(eqs, base_default, root, source) {
+ir_parse_config <- function(eqs, base_default, root, source,
+                            read_include, custom) {
   i <- vcapply(eqs, "[[", "type") == "config"
 
-  config <- lapply(unname(eqs[i]), ir_parse_config1, source)
+  config <- lapply(unname(eqs[i]), ir_parse_config1, source, custom)
 
   nms <- vcapply(config, function(x) x$lhs$name_data)
 
   base <- ir_parse_config_base(config[nms == "base"], base_default, source)
-  include <- ir_parse_config_include(config[nms == "include"], root, source)
+  include <- ir_parse_config_include(config[nms == "include"], root, source,
+                                     read_include)
+  custom <- ir_parse_config_custom(config[nms %in% custom], source)
 
-  list(base = base, include = include)
+  ret <- list(base = base, include = include)
+  if (length(custom) > 0) {
+    ret$custom <- custom
+  }
+  ret
 }
 
 
@@ -33,46 +40,59 @@ ir_parse_config_base <- function(config, base_default, source) {
 }
 
 
-ir_parse_config_include <- function(config, root, source) {
-  if (length(config) == 0L) {
+ir_parse_config_include <- function(include, root, source, read_include) {
+  if (length(include) == 0) {
     return(NULL)
   }
 
-  read1 <- function(x) {
-    filename <- file.path(root, x$rhs$value)
-    if (!file.exists(filename)) {
-      ir_parse_error(
-        sprintf("Could not find file '%s' (relative to root '%s')",
-                x$rhs$value, root),
-        x$source, source)
-    }
-    tryCatch(
-      read_user_c(filename),
-      error = function(e)
-        ir_parse_error(paste("Could not read include file:", e$message),
-                       x$source, source))
+  ## First check that the paths exist:
+  filename <- vcapply(include, function(x) x$rhs$value)
+  filename_full <- file.path(root, filename)
+  msg <- !file.exists(filename_full)
+  if (any(msg)) {
+    ## Only throw here on the first, for simplicity
+    x <- include[msg][[1]]
+    ir_parse_error(
+      sprintf("Could not find file '%s' (relative to root '%s')",
+              x$rhs$value, root),
+      x$source, source)
   }
 
-  ## TODO: this is more roundabout than needed - join_library should
-  ## be replaced to support this.
-  res <- join_library(lapply(config, read1))
-  if (any(duplicated(res$declarations))) {
-    ir_parse_error("Duplicate declarations while reading includes",
-                   ir_parse_error_lines(config), source)
+  res <- lapply(filename_full, function(path)
+    withCallingHandlers(
+      read_include(path),
+      error = function(e) message(sprintf("While reading '%s'", path))))
+
+  nms <- unlist(lapply(res, "[[", "names"))
+  dups <- unique(nms[duplicated(nms)])
+  if (length(dups) > 0L) {
+    lines <- vnapply(include, "[[", "source")
+    ir_parse_error(sprintf("Duplicated function %s while reading includes",
+                           paste(squote(dups), collapse = ", ")),
+                   lines, source)
   }
 
-  declarations <- strsplit(res$declarations, "\n")
-  definitions <- strsplit(res$definitions, "\n")
-  ret <- lapply(names(res$declarations), function(x)
-    list(name = x,
-         declaration = declarations[[x]],
-         definition = definitions[[x]]))
-  names(ret) <- names(res$declarations)
-  ret
+  list(names = nms,
+       data = lapply(res, "[[", "data"))
 }
 
 
-ir_parse_config1 <- function(eq, source) {
+ir_parse_config_custom <- function(x, source) {
+  if (length(x) == 0) {
+    return(NULL)
+  }
+
+  ## Is there any other validation that can really be done? We could
+  ## require that custom cases conform to particular types or are
+  ## unique? For now we'll be really leniant since we don't document
+  ## this as a public interface yet.
+  name <- vcapply(x, function(el) el$lhs$name_lhs)
+  value <- lapply(x, function(el) el$rhs$value)
+  unname(Map(list, name = name, value = value))
+}
+
+
+ir_parse_config1 <- function(eq, source, custom) {
   target <- eq$lhs$name_data
   value <- eq$rhs$value
 
@@ -80,19 +100,20 @@ ir_parse_config1 <- function(eq, source) {
     target,
     base = "character",
     include = "character",
-    ir_parse_error(sprintf("Unknown configuration option: %s", target),
-                   eq$source, source))
+    NULL)
 
-  if (!is.atomic(value)) {
-    ir_parse_error("config() rhs must be atomic (not an expression or symbol)",
-                   eq$source, source)
-  }
-
-  if (storage.mode(value) != expected_type) {
-    ir_parse_error(sprintf(
-      "Expected a %s for config(%s) but recieved a %s",
-      expected_type, target, storage.mode(value)),
-      eq$source, source)
+  if (is.null(expected_type)) {
+    if (!(target %in% custom)) {
+      ir_parse_error(sprintf("Unknown configuration option: %s", target),
+                     eq$source, source)
+    }
+  } else {
+    if (storage.mode(value) != expected_type) {
+      ir_parse_error(sprintf(
+        "Expected a %s for config(%s) but recieved a %s",
+        expected_type, target, storage.mode(value)),
+        eq$source, source)
+    }
   }
 
   eq

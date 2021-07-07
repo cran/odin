@@ -27,7 +27,7 @@
 ##
 ## The dim() calls get written out as a new group of data elements;
 ## we'll sort that out here too.
-ir_parse_arrays <- function(eqs, variables, source) {
+ir_parse_arrays <- function(eqs, variables, include, source) {
   ir_parse_arrays_check_indices(eqs, source)
   eqs <- ir_parse_arrays_find_integers(eqs, variables, source)
 
@@ -71,7 +71,7 @@ ir_parse_arrays <- function(eqs, variables, source) {
     eqs[[eq$name]]$array <- eqs[[eq$lhs$name_data]]$array
   }
 
-  ir_parse_arrays_check_usage2(eqs, source)
+  ir_parse_arrays_check_usage2(eqs, include, source)
 
   eqs
 }
@@ -86,6 +86,7 @@ ir_parse_arrays_check_usage <- function(eqs, source) {
   is_user <- vlapply(eqs, function(x) x$type == "user")
   is_copy <- vlapply(eqs, function(x) x$type == "copy")
   is_delay <- vlapply(eqs, function(x) x$type == "delay")
+  is_config <- vlapply(eqs, function(x) x$type == "config")
   is_delay_array <- vlapply(eqs, function(x)
     x$type == "delay" && !is.null(x$lhs$index))
   name_data <- vcapply(eqs, function(x) x$lhs$name_data)
@@ -126,7 +127,7 @@ ir_parse_arrays_check_usage <- function(eqs, source) {
   }
 
   ## Then, start checking for duplicates:
-  err <- is_duplicated(names(eqs)) & !is_array & !is_inplace
+  err <- is_duplicated(names(eqs)) & !is_array & !is_inplace & !is_config
   if (any(err)) {
     ir_parse_error(
       sprintf("Duplicate entries must all be array assignments (%s)",
@@ -144,7 +145,7 @@ ir_parse_arrays_check_usage <- function(eqs, source) {
 }
 
 
-ir_parse_arrays_check_usage2 <- function(eqs, source) {
+ir_parse_arrays_check_usage2 <- function(eqs, include, source) {
   ## TODO: this feels really icky, but at least gets there.  What
   ## would be nicer in the longer term perhaps is something that flags
   ## the "canonical" version of a piece of data amongst equations.
@@ -164,18 +165,22 @@ ir_parse_arrays_check_usage2 <- function(eqs, source) {
 
   for (eq in eqs) {
     if (eq$type == "expression_scalar" || eq$type == "expression_inplace") {
-      ir_parse_arrays_check_rhs(eq$rhs$value, rank, int_arrays, eq, source)
+      ir_parse_arrays_check_rhs(eq$rhs$value, rank, int_arrays, include,
+                                eq, source)
     } else if (eq$type == "expression_array") {
       for (el in eq$rhs) {
-        ir_parse_arrays_check_rhs(el$value, rank, int_arrays, eq, source)
+        ir_parse_arrays_check_rhs(el$value, rank, int_arrays, include,
+                                  eq, source)
       }
     } else if (eq$type == "delay") {
-      ir_parse_arrays_check_rhs(eq$rhs$value, rank, int_arrays, eq, source)
-      ir_parse_arrays_check_rhs(eq$delay$default, rank, int_arrays, eq, source)
+      ir_parse_arrays_check_rhs(eq$rhs$value, rank, int_arrays, include,
+                                eq, source)
+      ir_parse_arrays_check_rhs(eq$delay$default, rank, int_arrays, include,
+                                eq, source)
     } else {
       ## TODO: not sure what comes through here, or if this is correct
       ## at all.
-      ir_parse_arrays_check_rhs(eq, rank, int_arrays, source)
+      ir_parse_arrays_check_rhs(eq, rank, int_arrays, include, eq, source)
     }
   }
 }
@@ -439,7 +444,8 @@ ir_parse_arrays_dims <- function(eq, eqs, rank, variables, output) {
                     lhs = list(name_lhs = eq$name,
                                name_data = eq$name,
                                name_equation = eq$name,
-                               storage_type = "int"),
+                               storage_type = "int",
+                               dim = TRUE),
                     rhs = eq$rhs,
                     depends = depends_dim,
                     source = eq$source)
@@ -453,20 +459,20 @@ ir_parse_arrays_dims <- function(eq, eqs, rank, variables, output) {
         name = d,
         type = type,
         lhs = list(name_lhs = d, name_data = d, name_equation = d,
-                   storage_type = "int"),
+                   storage_type = "int", dim = TRUE),
         rhs = list(value = eq$rhs$value[[i]]),
         implicit = TRUE,
         source = eq$source,
         depends = depends_dim)
     }
     eq_dim <- lapply(seq_len(rank), f_eq_dim)
-    dimnames$dim <- vcapply(eq_dim, "[[", "name")
+    dimnames$dim <- lapply(eq_dim, "[[", "name")
 
     ## At this point, modify how we compute total length:
     dims <- lapply(dimnames$dim, as.name)
     eq_length$rhs$value <- r_fold_call("*", dims)
     eq_length$depends <- list(functions = character(0),
-                              variables = dimnames$dim)
+                              variables = list_to_character(dimnames$dim))
 
     ## Even more bits
     if (rank > 2L) {
@@ -478,16 +484,17 @@ ir_parse_arrays_dims <- function(eq, eqs, rank, variables, output) {
           name = d,
           type = "expression_scalar",
           lhs = list(name_lhs = d, name_data = d, name_equation = d,
-                     storage_type = "int"),
+                     storage_type = "int", dim = TRUE),
           rhs = list(value = r_fold_call("*", dims[j])),
           implicit = TRUE,
           source = eq$source,
           depends = list(functions = character(0),
-                         variables = dimnames$dim[j]))
+                         variables = list_to_character(dimnames$dim[j])))
       }
       eq_mult <- lapply(3:rank, f_eq_mult)
     }
-    dimnames$mult <- c("", dimnames$dim[[1]], vcapply(eq_mult, "[[", "name"))
+    dimnames$mult <- c(list("", dimnames$dim[[1]]),
+                       lapply(eq_mult, "[[", "name"))
   }
 
   no_alloc <-
@@ -706,7 +713,8 @@ ir_parse_arrays_used_as_index <- function(eqs) {
 }
 
 
-ir_parse_arrays_check_rhs <- function(rhs, rank, int_arrays, eq, source) {
+ir_parse_arrays_check_rhs <- function(rhs, rank, int_arrays, include, eq,
+                                      source) {
   throw <- function(...) {
     ir_parse_error(sprintf(...), eq$source, source)
   }
@@ -714,7 +722,7 @@ ir_parse_arrays_check_rhs <- function(rhs, rank, int_arrays, eq, source) {
   ## TODO: check that the right number of indices are used when using sum?
   array_special_function <-
     c("sum", "odin_sum", "length", "dim", "interpolate",
-      names(FUNCTIONS_INPLACE))
+      names(FUNCTIONS_INPLACE), include)
   nms <- names(rank)
 
   check <- function(e, array_special) {
@@ -753,6 +761,8 @@ ir_parse_arrays_check_rhs <- function(rhs, rank, int_arrays, eq, source) {
         } else {
           throw("Unknown array variable %s in '%s'", x, deparse_str(e))
         }
+      } else if (f_nm %in% include) {
+        ## Suspends all further checking on user-supplied functions
       } else {
         if (f_nm == "rmultinom" || f_nm == "rmhyper") {
           arr_idx <- 2L
@@ -843,66 +853,4 @@ ir_parse_expr_lhs_check_index <- function(x) {
   } else {
     structure(FALSE, message = x)
   }
-}
-
-
-ir_parse_arrays_check_naked_index <- function(eqs, no_check_naked_index,
-                                              source) {
-  if (no_check_naked_index) {
-    return()
-  }
-  used <- lapply(eqs, ir_parse_arrays_uses_naked_index)
-  n <- lengths(used)
-  i <- n > 0
-  if (any(i)) {
-    msg <- paste(
-      "Equations use index variables %s on the rhs outside of an index.",
-      "The behaviour of this has changed since odin 0.1.3 - see",
-      "https://github.com/mrc-ide/odin/issues/136 for details.",
-      "To silence this note, set option `odin.no_check_naked_index` to TRUE",
-      "This note will disappear in a version after odin 1.0.0",
-      sep = "\n")
-    x <- paste(sort(unique(unlist(used, FALSE, FALSE))), collapse = ", ")
-    ir_parse_note(sprintf(msg, x), ir_parse_error_lines(eqs[i]), source)
-  }
-}
-
-
-ir_parse_arrays_uses_naked_index <- function(eq) {
-  if (!any(INDEX %in% eq$depends$variables)) {
-    return(character(0))
-  }
-
-  found <- collector()
-
-  check_expr <- function(expr) {
-    if (!is.recursive(expr)) {
-      symbol <- as.character(expr)
-      if (symbol %in% INDEX) {
-        found$add(symbol)
-      }
-    } else {
-      fn <- as.character(expr[[1]])
-      if (fn %in% c("[", "odin_sum")) {
-        return()
-      }
-      if (fn == "==") {
-        ok <-
-          is.symbol(expr[[2]]) && as.character(expr[[2]]) %in% INDEX &&
-          is.symbol(expr[[3]]) && as.character(expr[[3]]) %in% INDEX
-        if (ok) {
-          return()
-        }
-      }
-      unlist(lapply(expr, check_expr))
-    }
-  }
-
-  if (eq$type == "expression_array") {
-    for (el in eq$rhs) {
-      check_expr(el$value)
-    }
-  }
-
-  unique(found$get())
 }

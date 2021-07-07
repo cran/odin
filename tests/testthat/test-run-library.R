@@ -1,17 +1,17 @@
-context("run: %TARGET%: library support")
+context("run: library support")
 
-test_that("abs", {
+test_that_odin("abs", {
   gen <- odin({
     deriv(y) <- 0
     initial(y) <- 0
     output(a) <- abs(t)
   })
   tt <- seq(-5, 5, length.out = 101)
-  expect_equal(gen()$run(tt)[, "a"], abs(tt))
+  expect_equal(gen$new()$run(tt)[, "a"], abs(tt))
 })
 
 
-test_that("log", {
+test_that_odin("log", {
   gen <- odin({
     deriv(y) <- 0
     initial(y) <- 0
@@ -20,14 +20,14 @@ test_that("log", {
     output(c) <- log(t, 10)
   })
   tt <- seq(0.0001, 5, length.out = 101)
-  yy <- gen()$run(tt)
+  yy <- gen$new()$run(tt)
   expect_equal(yy[, "a"], log(tt))
   expect_equal(yy[, "b"], log2(tt))
   expect_equal(yy[, "c"], log10(tt))
 })
 
 
-test_that("pow", {
+test_that_odin("pow", {
   gen <- odin({
     deriv(y) <- 0
     initial(y) <- 0
@@ -35,13 +35,13 @@ test_that("pow", {
     output(b) <- max(t, t^2 - 2, -t)
   })
   tt <- seq(0.0001, 5, length.out = 101)
-  yy <- gen()$run(tt)
+  yy <- gen$new()$run(tt)
   expect_equal(yy[, "a"], pmin(tt, tt^2 - 2, -tt))
   expect_equal(yy[, "b"], pmax(tt, tt^2 - 2, -tt))
 })
 
 
-test_that("%%", {
+test_that_odin("%%", {
   gen <- odin({
     deriv(y) <- 0
     initial(y) <- 0
@@ -57,10 +57,10 @@ test_that("%%", {
     output(q4) <- -t %% -q
   })
   tt <- seq(-5, 5, length.out = 101)
-  mod <- gen()
+  mod <- gen$new()
   res <- mod$run(tt)
-  s <- mod$contents()[["s"]]
-  q <- mod$contents()[["q"]]
+  s <- sin(1)
+  q <- 1.0
 
   expect_equal(res[, "s1"],  tt %%  s)
   expect_equal(res[, "s2"], -tt %%  s)
@@ -74,7 +74,7 @@ test_that("%%", {
 })
 
 
-test_that("%/%", {
+test_that_odin("%/%", {
   ## As for %% but with %/%
   gen <- odin({
     deriv(y) <- 0
@@ -91,10 +91,10 @@ test_that("%/%", {
     output(q4) <- -t %/% -q
   })
   tt <- seq(-5, 5, length.out = 101)
-  mod <- gen()
+  mod <- gen$new()
   res <- mod$run(tt)
-  s <- mod$contents()[["s"]]
-  q <- mod$contents()[["q"]]
+  s <- sin(1)
+  q <- 1.0
 
   expect_equal(res[, "s1"],  tt %/%  s)
   expect_equal(res[, "s2"], -tt %/%  s)
@@ -108,7 +108,7 @@ test_that("%/%", {
 })
 
 
-test_that("2-arg round", {
+test_that_odin("2-arg round", {
   gen <- odin({
     deriv(x) <- 1
     initial(x) <- 1
@@ -119,9 +119,9 @@ test_that("2-arg round", {
     z <- round(t)
   })
 
-  mod0 <- gen(0)
-  mod1 <- gen(1)
-  mod2 <- gen(2)
+  mod0 <- gen$new(n = 0)
+  mod1 <- gen$new(n = 1)
+  mod2 <- gen$new(n = 2)
 
   tt <- seq(0, 1, length.out = 101)
   yy0 <- mod0$run(tt)
@@ -138,7 +138,7 @@ test_that("2-arg round", {
 })
 
 
-test_that("multivariate hypergeometric", {
+test_that_odin("multivariate hypergeometric", {
   gen <- odin({
     x0[] <- user()
     dim(x0) <- user()
@@ -160,7 +160,7 @@ test_that("multivariate hypergeometric", {
 
   k <- c(6, 10, 15, 3, 0, 4)
   n <- 20
-  mod <- gen(x0 = k, n = n)
+  mod <- gen$new(x0 = k, n = n)
 
   set.seed(1)
   res <- mod$run(0:10)
@@ -172,7 +172,7 @@ test_that("multivariate hypergeometric", {
   expect_equal(yy$tmp[-11L, ], yy$x[-1L, ])
 })
 
-test_that("multivariate hypergeometric - integer input", {
+test_that_odin("multivariate hypergeometric - integer input", {
   gen <- odin({
     x0[] <- user()
     dim(x0) <- user(integer = TRUE)
@@ -201,7 +201,7 @@ test_that("multivariate hypergeometric - integer input", {
 
   k <- c(6, 10, 15, 3, 0, 4)
   n <- 20
-  mod <- gen(x0 = k, n = n)
+  mod <- gen$new(x0 = k, n = n)
 
   set.seed(1)
   res <- mod$run(0:10)
@@ -213,7 +213,7 @@ test_that("multivariate hypergeometric - integer input", {
   expect_equal(yy$y[-1L, ], cmp)
 })
 
-test_that("Throw an error if requesting more elements than possible", {
+test_that_odin("Throw an error if requesting more elements than possible", {
   gen <- odin({
     b[] <- user()
     n <- user()
@@ -229,8 +229,21 @@ test_that("Throw an error if requesting more elements than possible", {
   })
   b <- c(10, 15, 9)
   n <- 10
-  mod <- gen(b = b, n = n)
+  mod <- gen$new(b = b, n = n)
   expect_error(mod$run(step = 2),
                "Requesting too many elements in rmhyper (10 from 0)",
                fixed = TRUE)
+})
+
+
+test_that_odin("Can use as.numeric", {
+  gen <- odin({
+    a <- user(integer = TRUE)
+    b <- as.numeric(a)
+    initial(x) <- 0
+    update(x) <- x + b
+  })
+  mod <- gen$new(a = 5L)
+  y <- mod$run(0:10)
+  expect_equal(y[, "x"], seq(0, 50, by = 5))
 })

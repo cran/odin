@@ -27,6 +27,8 @@ generate_r <- function(dat, options) {
   ## Then start putting together the initial conditions
   env <- new.env(parent = odin_base_env())
 
+  generate_r_include(dat, env)
+
   ## Support functions will come in this way:
   if (dat$features$has_user) {
     env[[dat$meta$support$get_user_double]] <- support_get_user_double
@@ -39,7 +41,9 @@ generate_r <- function(dat, options) {
   }
 
   core <- generate_r_core(eqs, dat, env, rewrite)
-  generate_r_class(core, dat, env)
+  ret <- generate_r_class(core, dat, env)
+  attr(ret, "generator") <- env[[dat$config$base]]
+  ret
 }
 
 
@@ -450,5 +454,17 @@ generate_r_dim <- function(data_info, rewrite) {
     rewrite(data_info$dimnames$length)
   } else {
     as.call(c(list(quote(c)), lapply(data_info$dimnames$dim, rewrite)))
+  }
+}
+
+
+generate_r_include <- function(dat, env) {
+  include <- dat$config$include$data
+  if (length(include) > 0) {
+    src <- unlist(lapply(include, function(x) list_to_character(x$source)))
+    tmp <- tempfile()
+    on.exit(unlink(tmp))
+    writeLines(src, tmp)
+    sys.source(tmp, env)
   }
 }

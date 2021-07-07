@@ -9,3 +9,12 @@ test_that("deserialise", {
   res <- odin_ir_deserialise(ir)
   expect_identical(res$ir, ir)
 })
+
+
+test_that("Stage information included in IR", {
+  ir <- odin_parse_("examples/array_odin.R",
+                    options = odin_options(rewrite_constants = FALSE))
+  dat <- odin_ir_deserialise(ir)
+  expect_equal(dat$data$elements$N_age$stage, "constant")
+  expect_equal(dat$data$elements$I_tot$stage, "time")
+})

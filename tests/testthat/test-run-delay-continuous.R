@@ -1,6 +1,6 @@
-context("run: %TARGET%: continuous delays")
+context("run: continuous delays")
 
-test_that("mixed delay model", {
+test_that_odin("mixed delay model", {
   ## I want a model where the components of a delay are an array and a
   ## scalar.  This is going to be a pretty common thing to have, and I
   ## think it will throw up a few corner cases that are worth keeping
@@ -39,7 +39,7 @@ test_that("mixed delay model", {
     y0 <- runif(3)
     r <- runif(3)
     if (i == 1) {
-      mod <- gen(y0 = y0, r = r)
+      mod <- gen$new(y0 = y0, r = r)
     } else {
       mod$set_user(y0 = y0, r = r)
     }
@@ -69,7 +69,7 @@ test_that("mixed delay model", {
 })
 
 
-test_that("use subset of variables", {
+test_that_odin("use subset of variables", {
   gen <- odin({
     deriv(a) <- 1
     deriv(b) <- 2
@@ -83,13 +83,13 @@ test_that("use subset of variables", {
   })
 
   tt <- seq(0, 10, length.out = 101)
-  mod <- gen()
+  mod <- gen$new()
   yy <- mod$run(tt)
   expect_equal(yy[, "tmp"],
                0.5 + ifelse(tt <= 2, 0, (tt - 2)) * 5)
 })
 
-test_that("delay array storage", {
+test_that_odin("delay array storage", {
   gen <- odin({
     ## Exponential growth/decay of 'y'
     deriv(y[]) <- r[i] * y[i]
@@ -117,7 +117,7 @@ test_that("delay array storage", {
     y0 <- runif(2 + i)
     r <- runif(2 + i)
     if (i == 1) {
-      mod <- gen(y0 = y0, r = r)
+      mod <- gen$new(y0 = y0, r = r)
     } else {
       mod$set_user(y0 = y0, r = r)
     }
@@ -141,7 +141,7 @@ test_that("delay array storage", {
   }
 })
 
-test_that("3 arg delay", {
+test_that_odin("3 arg delay", {
   gen <- odin({
     ylag <- delay(y, 3, 2) # lag time 3, default value 2
     initial(y) <- 0.5
@@ -150,7 +150,7 @@ test_that("3 arg delay", {
     config(base) <- "delay3"
   })
 
-  mod <- gen()
+  mod <- gen$new()
   tt <- seq(0, 3, length.out = 101)
   yy <- mod$run(tt)
   expect_equal(yy[, "ylag"], rep(2.0, length(tt)))
@@ -164,7 +164,7 @@ test_that("3 arg delay", {
 })
 
 
-test_that("3 arg delay with array", {
+test_that_odin("3 arg delay with array", {
   gen <- odin({
     deriv(a[]) <- i
     initial(a[]) <- (i - 1) / 10
@@ -178,7 +178,7 @@ test_that("3 arg delay with array", {
 
   tt <- seq(0, 2, length.out = 11)
   x <- -runif(5, 2, 3)
-  mod <- gen(alt = x)
+  mod <- gen$new(alt = x)
   yy <- mod$transform_variables(mod$run(tt))
   expect_equal(yy$tmp, matrix(x, length(tt), length(x), TRUE))
 
@@ -194,7 +194,7 @@ test_that("3 arg delay with array", {
 
 ## This should also be done with a couple of scalars thrown in here
 ## too I think; they change things also.
-test_that("delay index packing", {
+test_that_odin("delay index packing", {
   gen <- odin({
     deriv(a[]) <- i
     deriv(b[]) <- i
@@ -219,16 +219,27 @@ test_that("delay index packing", {
     dim(e) <- 14
   })
 
-  mod <- gen()
+  dim_a <- 10
+  dim_b <- 11
+  dim_c <- 12
+  dim_d <- 13
+  dim_e <- 14
+  dim_foo <- 9
+  offset_variable_c <- 21 # i.e., 10 + 11
+  offset_variable_e <- 46 # i.e., 10 + 11 + 12 + 13
+
+  mod <- gen$new()
   dat <- mod$contents()
 
   seq0 <- function(n) seq_len(n)
 
-  expect_equal(dat$dim_delay_foo, dat$dim_b + dat$dim_c + dat$dim_e)
+  if (odin_target_name() == "c") {
+    expect_length(dat$delay_state_foo, dim_b + dim_c + dim_e)
+  }
 
-  delay_index_foo <- c(dat$dim_a + seq0(dat$dim_b),
-                       dat$offset_variable_c + seq0(dat$dim_c),
-                       dat$offset_variable_e + seq0(dat$dim_e))
+  delay_index_foo <- c(dim_a + seq0(dim_b),
+                       offset_variable_c + seq0(dim_c),
+                       offset_variable_e + seq0(dim_e))
   if (odin_target_name() == "c") {
     delay_index_foo <- delay_index_foo - 1L
   }
@@ -237,7 +248,7 @@ test_that("delay index packing", {
   tt <- seq(0, 10, length.out = 11)
   yy <- mod$transform_variables(mod$run(tt))
 
-  i <- seq_len(dat$dim_foo)
+  i <- seq_len(dim_foo)
   expect_equal(yy$foo[1, ],
                yy$b[1, i] + yy$c[1, i + 1] + yy$e[1, i + 2])
   expect_equal(yy$foo[8, ],
@@ -245,7 +256,7 @@ test_that("delay index packing", {
 })
 
 
-test_that("nontrivial time", {
+test_that_odin("nontrivial time", {
   gen <- odin({
     ylag <- delay(y, 2 + 3)
     initial(y) <- 0.5
@@ -254,13 +265,13 @@ test_that("nontrivial time", {
   })
 
   tt <- 0:10
-  y <- gen()$run(tt)
+  y <- gen$new()$run(tt)
   expect_equal(y[, "ylag"],
                c(rep(0.5, 6), seq(1.5, by = 1, length.out = 5)))
 })
 
 
-test_that("overlapping array storage", {
+test_that_odin("overlapping array storage", {
   gen <- odin({
     ## Exponential growth/decay of 'y'
     deriv(y[]) <- r[i] * y[i]
@@ -290,7 +301,7 @@ test_that("overlapping array storage", {
     y0 <- runif(2 + i)
     r <- runif(2 + i)
     if (i == 1) {
-      mod <- gen(y0 = y0, r = r)
+      mod <- gen$new(y0 = y0, r = r)
     } else {
       mod$set_user(y0 = y0, r = r)
     }
@@ -320,7 +331,7 @@ test_that("overlapping array storage", {
 })
 
 
-test_that("delayed delays", {
+test_that_odin("delayed delays", {
   gen <- odin({
     deriv(y) <- y
     initial(y) <- 1
@@ -333,7 +344,7 @@ test_that("delayed delays", {
   })
 
   tt <- seq(0, 7, length.out = 51)
-  yy <- gen()$run(tt)
+  yy <- gen$new()$run(tt)
 
   ## First delay
   a <- ifelse(tt > 2, exp(tt - 2) + 1, exp(0) + 1)
@@ -344,7 +355,7 @@ test_that("delayed delays", {
 })
 
 
-test_that("compute derivative", {
+test_that_odin("compute derivative", {
   gen <- odin({
     deriv(a) <- sin(t)
     initial(a) <- -1
@@ -368,7 +379,7 @@ test_that("compute derivative", {
   ## >  da/dt = sin(t)
   ## >  db/dt = if initialised => -cos(t)
   ## >          else           => -1
-  mod <- gen()
+  mod <- gen$new()
   expect_identical(mod$contents()$initial_t, NA_real_)
 
   ## First, uninitialised:
@@ -413,4 +424,81 @@ test_that("compute derivative", {
                structure(c(sin(t2), -cos(t2 - pi / 4)),
                          output = -cos(t2 - pi / 4)),
                tolerance = 1e-5)
+})
+
+
+## This triggered a crash in set_initial, due to invalid loading of
+## array initial variable information
+test_that_odin("delay with array and provide input", {
+  gen <- odin({
+    ## Exponential growth/decay of 'y'
+    deriv(y[]) <- r[i] * y[i]
+    initial(y[]) <- y0[i]
+    r[] <- user()
+
+    ## Drive the system off of given 'y0'
+    y0[] <- user()
+    dim(y0) <- user()
+    dim(y) <- length(y0)
+    dim(r) <- length(y0)
+
+    ## And of a scalar 'z'
+    deriv(z) <- rz * z
+    initial(z) <- 1
+    rz <- 0.1
+
+    ## Sum over all the variables
+    total <- sum(y) + z
+
+    ## Delay the total of all variables
+    a <- delay(total, 2.5)
+
+    ## And output that for checking
+    output(a) <- a
+  })
+
+  set.seed(1)
+  y0 <- runif(3)
+  r <- runif(3)
+  tt <- seq(0, 5, length.out = 101)
+  real_y <- t(y0 * exp(outer(r, tt)))
+  real_z <- exp(0.1 * tt)
+
+  mod <- gen$new(y0 = numeric(length(y0)), r = r)
+  yy <- mod$run(tt, c(1, y0), rtol = 1e-8, atol = 1e-8)
+  zz <- mod$transform_variables(yy)
+
+  expect_equal(zz$y, real_y, tolerance = 1e-6)
+  expect_equal(zz$z, real_z, tolerance = 1e-6)
+})
+
+
+test_that_odin("set initial conditions in delay differential equation", {
+  gen <- odin({
+    ylag <- delay(y, 2 + 3)
+    initial(y) <- 0.5
+    deriv(y) <- 1
+    output(ylag) <- TRUE
+  })
+
+  tt <- 0:10
+  y <- gen$new()$run(tt, 1)
+  expect_equal(y[, "y"], 1:11)
+  expect_equal(y[, "ylag"],
+               c(rep(1, 6), seq(2, by = 1, length.out = 5)))
+})
+
+
+test_that_odin("can set/omit ynames", {
+  gen <- odin({
+    ylag <- delay(y, 2 + 3)
+    initial(y) <- 0.5
+    deriv(y) <- 1
+    output(ylag) <- TRUE
+  })
+
+  tt <- 0:10
+  mod <- gen$new()
+  expect_equal(colnames(mod$run(tt)), c("t", "y", "ylag"))
+  expect_null(colnames(mod$run(tt, use_names = FALSE)))
 })

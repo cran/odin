@@ -1,13 +1,13 @@
-context("run: %TARGET%: stochastic")
+context("run: stochastic")
 
-test_that("stochastic", {
+test_that_odin("stochastic", {
   ## Here's a stochastic random walk:
   gen <- odin({
     initial(x) <- 0
     update(x) <- x + norm_rand()
   })
 
-  mod <- gen()
+  mod <- gen$new()
   tt <- 0:20
   set.seed(1)
   yy1 <- mod$run(tt)
@@ -26,14 +26,14 @@ test_that("stochastic", {
 ## I'm not totally sure what the right call is here.  If I make a
 ## variable that is used only in the initial condition I do not want
 ## that repeatedly called during the run.
-test_that("stochastic variables are time dependent", {
+test_that_odin("stochastic variables are time dependent", {
   gen <- odin({
     v <- norm_rand() # this variable is implicitly time dependent.
     initial(x) <- 0
     update(x) <- x + v
   })
 
-  mod <- gen()
+  mod <- gen$new()
   tt <- 0:20
   set.seed(1)
   yy1 <- mod$run(tt)
@@ -44,7 +44,7 @@ test_that("stochastic variables are time dependent", {
 })
 
 
-test_that("array stochastic variables are time dependent", {
+test_that_odin("array stochastic variables are time dependent", {
   ## This checks that even in the absence of array indexing on the RHS
   ## array variables are set correctly when stochastic.
   gen <- odin({
@@ -53,7 +53,7 @@ test_that("array stochastic variables are time dependent", {
     dim(x) <- 3
   })
 
-  mod <- gen()
+  mod <- gen$new()
   tt <- 0:20
   set.seed(1)
   yy <- mod$run(tt)
@@ -64,7 +64,7 @@ test_that("array stochastic variables are time dependent", {
 })
 
 
-test_that("stochastic initial conditions don't get called every step", {
+test_that_odin("stochastic initial conditions don't get called every step", {
   ## There is quite a few nasty little conditions that are tested
   ## here.
   gen <- odin({
@@ -74,7 +74,7 @@ test_that("stochastic initial conditions don't get called every step", {
   })
 
   cmp <- .Random.seed
-  mod <- gen()
+  mod <- gen$new()
   expect_equal(.Random.seed, cmp)
 
   ## Initial conditions (why is $init even a member here?)
@@ -106,7 +106,7 @@ test_that("stochastic initial conditions don't get called every step", {
 })
 
 
-test_that("exotic stochastic functions", {
+test_that_odin("exotic stochastic functions", {
   gen <- odin({
     initial(x) <- 0
     mu <- 1
@@ -115,7 +115,7 @@ test_that("exotic stochastic functions", {
   })
 
   set.seed(1)
-  mod <- gen()
+  mod <- gen$new()
   y <- mod$run(0:10)
 
   set.seed(1)
@@ -123,7 +123,7 @@ test_that("exotic stochastic functions", {
 })
 
 
-test_that("round & rbinom", {
+test_that_odin("round & rbinom", {
   gen <- odin({
     size <- user()
     p <- user()
@@ -131,24 +131,24 @@ test_that("round & rbinom", {
     initial(x) <- rbinom(size, p)
   })
 
-  mod <- gen(p = 1, size = 0.4)
+  mod <- gen$new(p = 1, size = 0.4)
   expect_equal(mod$initial(0), 0)
   mod$set_user(p = 1, size = 1.7)
   expect_equal(mod$initial(0), 2)
 })
 
 
-test_that("mutlinomial", {
+test_that_odin("mutlinomial", {
   ## This is just a check that these compile and run
   sir1 <- odin("stochastic/sir_discrete.R")
   sir2 <- odin("stochastic/sir_discrete_stochastic.R")
   sir3 <- odin("stochastic/sir_discrete_stochastic2.R")
   sir4 <- odin("stochastic/sir_discrete_stochastic_multi.R")
 
-  mod1 <- sir1()
-  mod2 <- sir2()
-  mod3 <- sir3()
-  mod4 <- sir4()
+  mod1 <- sir1$new()
+  mod2 <- sir2$new()
+  mod3 <- sir3$new()
+  mod4 <- sir4$new()
 
   t <- 0:100
   y1 <- mod1$run(t)
@@ -162,14 +162,14 @@ test_that("mutlinomial", {
 })
 
 
-test_that("replicate: scalar", {
+test_that_odin("replicate: scalar", {
   ## TODO: this will be a nice version to try and benchmark the dde
   ## overheads I think...
   gen <- odin({
     initial(x) <- 0
     update(x) <- x + norm_rand()
   })
-  m <- gen()
+  m <- gen$new()
   tt <- 0:50
   res <- m$run(tt, replicate = 100)
   yy <- m$transform_variables(res)
@@ -181,7 +181,7 @@ test_that("replicate: scalar", {
 })
 
 
-test_that("replicate: array", {
+test_that_odin("replicate: array", {
   gen <- odin({
     initial(x) <- 0
     initial(y[]) <- 0
@@ -189,7 +189,7 @@ test_that("replicate: array", {
     update(y[]) <- y[i] + norm_rand() / 2
     dim(y) <- 3
   })
-  m <- gen()
+  m <- gen$new()
 
   tt <- 0:20
   res <- m$run(tt, replicate = 30)
@@ -204,12 +204,12 @@ test_that("replicate: array", {
 })
 
 
-test_that("low-level stochastics: norm_rand", {
+test_that_odin("low-level stochastics: norm_rand", {
   gen <- odin({
     initial(y) <- 0
     update(y) <- norm_rand()
   })
-  m <- gen()
+  m <- gen$new()
 
   tt <- 0:10
   set.seed(1)
@@ -220,12 +220,12 @@ test_that("low-level stochastics: norm_rand", {
 })
 
 
-test_that("low-level stochastics: unif_rand", {
+test_that_odin("low-level stochastics: unif_rand", {
   gen <- odin({
     initial(y) <- 0
     update(y) <- unif_rand()
   })
-  m <- gen()
+  m <- gen$new()
 
   tt <- 0:10
   set.seed(1)
@@ -236,12 +236,12 @@ test_that("low-level stochastics: unif_rand", {
 })
 
 
-test_that("low-level stochastics: exp_rand", {
+test_that_odin("low-level stochastics: exp_rand", {
   gen <- odin({
     initial(y) <- 0
     update(y) <- exp_rand()
   })
-  m <- gen()
+  m <- gen$new()
 
   tt <- 0:10
   set.seed(1)
@@ -252,12 +252,12 @@ test_that("low-level stochastics: exp_rand", {
 })
 
 
-test_that("rexp parametrisation", {
+test_that_odin("rexp parametrisation", {
   gen <- odin({
     initial(y) <- 0
     update(y) <- rexp(10)
   })
-  m <- gen()
+  m <- gen$new()
 
   tt <- 0:10
   set.seed(1)

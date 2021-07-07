@@ -96,10 +96,6 @@ short_hash <- function(x) {
   substr(x, 1L, 8L)
 }
 
-dllname <- function(base) {
-  paste0(base, .Platform$dynlib.ext)
-}
-
 dquote <- function(x) {
   sprintf('"%s"', x)
 }
@@ -218,4 +214,70 @@ odin_message <- function(msg, verbose) {
 
 new_empty_env <- function() {
   new.env(parent = emptyenv())
+}
+
+
+odin_file <- function(...) {
+  system.file(..., package = "odin", mustWork = TRUE)
+}
+
+
+glue_whisker <- function(template, data) {
+  glue::glue(template, .envir = data, .open = "{{", .close = "}}",
+             .trim = FALSE)
+}
+
+
+read_lines <- function(path) {
+  paste(readLines(path), collapse = "\n")
+}
+
+
+clean_package_name <- function(name) {
+  gsub("_", ".", name)
+}
+
+
+na_drop <- function(x) {
+  x[!is.na(x)]
+}
+
+
+assert_scalar_logical_or_null <- function(x, name = deparse(substitute(x))) {
+  if (!is.null(x)) {
+    if (length(x) != 1 || !is.logical(x) || is.na(x)) {
+      stop(sprintf("Expected '%s' to be a logical scalar (or NULL)", name))
+    }
+  }
+  invisible(x)
+}
+
+
+assert_scalar_character_or_null <- function(x, name = deparse(substitute(x))) {
+  if (!is.null(x)) {
+    if (length(x) != 1 || !is.character(x) || is.na(x)) {
+      stop(sprintf("Expected '%s' to be a character scalar (or NULL)", name))
+    }
+  }
+  invisible(x)
+}
+
+
+assert_named <- function(x, unique = FALSE, name = deparse(substitute(x))) {
+  if (is.null(names(x))) {
+    stop(sprintf("'%s' must be named", name), call. = FALSE)
+  }
+  if (unique && any(duplicated(names(x)))) {
+    stop(sprintf("'%s' must have unique names", name), call. = FALSE)
+  }
+  invisible(x)
+}
+
+
+assert_is <- function(x, what, name = deparse(substitute(x))) {
+  if (!inherits(x, what)) {
+    stop(sprintf("'%s' must be a %s", name, paste(what, collapse = " / ")),
+         call. = FALSE)
+  }
+  invisible(x)
 }

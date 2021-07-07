@@ -11,43 +11,7 @@ test_that("verbose", {
       update(x) <- x + norm_rand()
       config(base) <- "mycrazymodel"
     }, target = "c", workdir = tempfile(), skip_cache = TRUE, verbose = TRUE),
-    "mycrazymodel_[[:xdigit:]]{8}\\.c")
-})
-
-test_that("warnings", {
-  skip_on_cran() # this test is platform specific!
-  code <- quote({
-    initial(a) <- 1
-    deriv(a) <- if (t > 8 || t > 1 && t < 3) 1 else 0
-  })
-
-  str <- capture.output(
-    tmp <- odin_(code, verbose = TRUE, compiler_warnings = FALSE,
-                 skip_cache = TRUE, workdir = tempfile()))
-  out <- compiler_output_classify(str)
-
-  ## This will only give a warning with -Wall or greater.
-  has_warning <- any(vlapply(seq_along(out$type), function(i)
-    out$type[i] == "info" && attr(out$value[[i]], "type") == "warning"))
-  if (has_warning) {
-    re <- "(There was 1 compiler warning|There were [0-9]+ compiler warnings)"
-    expect_warning(
-      odin_(code, compiler_warnings = TRUE, skip_cache = TRUE,
-            workdir = tempfile()),
-      re)
-
-    with_options(
-      list(odin.compiler_warnings = FALSE),
-      expect_warning(odin_(code, verbose = FALSE, skip_cache = TRUE,
-                           workdir = tempfile()), NA))
-    with_options(
-      list(odin.compiler_warnings = TRUE),
-      expect_warning(odin_(code, verbose = FALSE, skip_cache = TRUE,
-                           workdir = tempfile()), re))
-  } else {
-    expect_warning(odin_(code, compiler_warnings = TRUE, verbose = FALSE,
-                         skip_cache = TRUE, workdir = tempfile()), NA) # none
-  }
+    "mycrazymodel[[:xdigit:]]{8}")
 })
 
 test_that("n_history is configurable", {
@@ -57,13 +21,11 @@ test_that("n_history is configurable", {
     deriv(y) <- 0.2 * ylag * 1 / (1 + ylag^10) - 0.1 * y
   })
 
-  mod <- gen(use_dde = TRUE)
-  expect_true("n_history" %in% names(formals(mod$run)))
+  mod <- gen$new(use_dde = TRUE)
   expect_error(mod$run(seq(0, 200), n_history = 0),
                "Integration failure: can't use ylag in model with no history")
 
-  mod <- gen(use_dde = FALSE)
-  expect_true("n_history" %in% names(formals(mod$run)))
+  mod <- gen$new(use_dde = FALSE)
   ## Don't test for precice deSolve error message; just test fail/pass
   expect_error(mod$run(seq(0, 200), n_history = 1))
   expect_error(mod$run(seq(0, 200), n_history = 1000), NA)
@@ -96,7 +58,7 @@ test_that("prevent unknown target", {
 ## issue #88
 test_that("force a vector of strings (compile)", {
   gen <- odin(c("deriv(y) <- 0.5", "initial(y) <- 1"), target = "r")
-  mod <- gen()
+  mod <- gen$new()
   y <- mod$run(0:10)[, "y"]
   expect_equal(y, seq(1, by = 0.5, length.out = 11))
 })
@@ -105,6 +67,23 @@ test_that("force a vector of strings (compile)", {
 ## issue #88
 test_that("force a vector of strings (parse)", {
   ir <- odin_parse(c("deriv(y) <- 0.5", "initial(y) <- 1"))
+  dat <- ir_deserialise(ir)
+  expect_equal(names(dat$data$variable$contents), "y")
+})
+
+
+test_that("force a symbol containing code", {
+  code <- c("deriv(y) <- 0.5", "initial(y) <- 1")
+  gen <- odin(code, target = "r")
+  mod <- gen$new()
+  y <- mod$run(0:10)[, "y"]
+  expect_equal(y, seq(1, by = 0.5, length.out = 11))
+})
+
+
+test_that("force a symbol containing code (parse)", {
+  code <- c("deriv(y) <- 0.5", "initial(y) <- 1")
+  ir <- odin_parse(code)
   dat <- ir_deserialise(ir)
   expect_equal(names(dat$data$variable$contents), "y")
 })
@@ -139,6 +118,32 @@ test_that("delay discrete models with defaults are prevented in C", {
     dim(z) <- 2
   }),
   "Discrete delays with default not yet supported")
+})
+
+
+test_that("Allow spaces in filenames", {
+  skip_on_cran()
+  path <- tempfile()
+  dir.create(path)
+  on.exit(unlink(path, recursive = TRUE))
+
+  filename <- file.path(path, "path with spaces.R")
+  writeLines(c("initial(x) <- 1", "deriv(x) <- 1"), filename)
+
+  mod <- odin(filename, target = "c")
+  expect_equal(ir_deserialise(odin_ir(mod))$config$base,
+               "path_with_spaces")
+})
+
+
+test_that("compatibility layer passes to R6 class", {
+  gen <- odin(c("deriv(y) <- 0.5", "initial(y) <- 1"), target = "r")
+  gen_r6 <- attr(gen, "generator")
+
+  expect_equal(capture.output(print(gen)), capture.output(print(gen_r6)))
+  expect_equal(utils::.DollarNames(gen), utils::.DollarNames(gen_r6))
+  expect_identical(gen$classname, gen_r6$classname)
+  expect_identical(gen[["classname"]], gen_r6[["classname"]])
 })
 
 

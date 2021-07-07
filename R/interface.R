@@ -1,5 +1,5 @@
 ##' Return detailed information about an odin model.  This is the
-##' mechanism through which \code{\link{coef}} works with odin.
+##' mechanism through which [coef] works with odin.
 ##'
 ##' @section Warning:
 ##'
@@ -8,11 +8,11 @@
 ##'
 ##' @title Return detailed information about an odin model
 ##'
-##' @param x An \code{odin_generator} function, as created by
-##'   \code{\link{odin}}
+##' @param x An `odin_generator` function, as created by
+##'   `odin::odin`
 ##'
 ##' @param parsed Logical, indicating if the representation should be
-##'   parsed and converted into an R object.  If \code{FALSE} we
+##'   parsed and converted into an R object.  If `FALSE` we
 ##'   return a json string.
 ##'
 ##' @export
@@ -25,20 +25,13 @@
 ##' coef(exp_decay)
 odin_ir <- function(x, parsed = FALSE) {
   if (inherits(x, "odin_generator")) {
-    ir <- attr(x, "ir")
+    ir <- attr(x, "ir") %||% attr(x, "generator")$public_methods$ir()
   } else if (inherits(x, "odin_model")) {
-    ir <- x$ir
+    ir <- x$ir()
   } else {
     stop("Expected an odin_generator or odin_model object")
   }
 
-  if (!inherits(ir, "json")) {
-    if (length(ir) == 2L) {
-      ir <- system.file(ir[[2]], package = ir[[1]], mustWork = TRUE)
-    }
-    ir <- read_string(ir)
-    class(ir) <- "json"
-  }
   if (parsed) {
     ir <- ir_deserialise(ir)
   }
@@ -73,22 +66,3 @@ coef.odin_generator <- function(object, ...) {
 
 ##' @export
 coef.odin_model <- coef.odin_generator
-
-
-##' @export
-print.odin_generator <- function(x, ...) {
-  cat(paste0(format(x, ...), "\n", collapse = ""))
-  invisible(x)
-}
-
-
-##' @export
-format.odin_generator <- function(x, ...) {
-  args <- utils::capture.output(args(x))
-  args <- args[-length(args)] # drop 'NULL'
-  user_info <- coef(x)
-  c(args,
-    "<an 'odin_generator' function>",
-    if (nrow(user_info) > 0L)
-      "  use coef() to get information on user parameters")
-}

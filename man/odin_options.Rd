@@ -7,7 +7,8 @@
 odin_options(verbose = NULL, target = NULL, workdir = NULL,
   validate = NULL, pretty = NULL, skip_cache = NULL,
   compiler_warnings = NULL, no_check_unused_equations = NULL,
-  no_check_naked_index = NULL, options = NULL)
+  rewrite_dims = NULL, rewrite_constants = NULL, substitutions = NULL,
+  options = NULL)
 }
 \arguments{
 \item{verbose}{Logical scalar indicating if the compilation should
@@ -19,7 +20,7 @@ defaulting to the option \code{odin.target} or "c" otherwise.}
 
 \item{workdir}{Directory to use for any generated files.  This is
 only relevant for the "c" target.  Defaults to the value of the
-option \code{odin.workdir} or \code{tempdir()} otherwise.}
+option \code{odin.workdir} or \code{\link[=tempdir]{tempdir()}} otherwise.}
 
 \item{validate}{Validate the model's intermediate representation
 against the included schema.  Normally this is not needed and is
@@ -36,44 +37,48 @@ model appears not to compile when you would expect it to.
 Hopefully this will not be needed often.  Defaults to the option
 \code{odin.skip_cache} or \code{FALSE} otherwise.}
 
-\item{compiler_warnings}{Logical scalar indicating if compiler
-warnings should be converted to R warnings.  If this is
-\code{TRUE}, then if any compiler warnings are generated, the
-compiler output will be displayed (regardless of the value of
-\code{verbose}) within an R warning (suppressible via
-\code{suppressWarnings} and catchable via \code{tryCatch}).  The
-default is to default to \code{FALSE} unless the global option
-\code{odin.compiler_warnings} is set to \code{TRUE} (set with
-\code{options(odin.compiler_warnings = TRUE)}).  The default may
-change to \code{TRUE} in future.  Warnings are currently a mix
-of ambiguous syntax in your model (worth fixing) and limitations
-in the code that odin generates (which you can't fix but I will
-get on to over time).  What is flagged will depend strongly on
-your platform and what is in your \code{Makevars}.  I develop
-odin with \code{-Wall -Wextra -pedantic} and still see warnings
-with both gcc and clang.  The compiler output is very simple and
-may not work on all platforms.  Defaults to the option
-\code{odin.compiler_warnings} or \code{FALSE} otherwise.}
+\item{compiler_warnings}{Previously this attempted detection of
+compiler warnings (with some degree of success), but is
+currently ignored. This may become supported again in a future
+version depending on underlying support in pkgbuild.}
 
 \item{no_check_unused_equations}{If \code{TRUE}, then don't print
 messages about unused variables.  Defaults to the option
 \code{odin.no_check_unused_equations} or \code{FALSE} otherwise.}
 
-\item{no_check_naked_index}{If \code{TRUE}, then if an index
-variable (\code{i}, \code{j}, ...) is used outside of an array
-subset (e.g., \code{x[] <- i}) then a notice is printed.  The
-behaviour of this functionality changed in odin version
-\code{0.2.0} and this flag is intended to notify users about the
-change.  See \url{https://github.com/mrc-ide/odin/issues/136}
-for more information.  Defaults to the option
-\code{odin.no_check_naked_index} or \code{FALSE} otherwise.}
+\item{rewrite_dims}{Logical, indicating if odin should try and
+rewrite your model dimensions (if using arrays). If \code{TRUE} then
+we replace dimensions known at compile-time with literal
+integers, and those known at initialisation with simplified and
+shared expressions. You may get less-comprehensible error
+messages with this option set to \code{TRUE} because parts of the
+model have been effectively evaluated during processing.}
+
+\item{rewrite_constants}{Logical, indicating if odin should try
+and rewrite \emph{all} constant scalars. This is a superset of
+\code{rewrite_dims} and may be slow for large models. Doing this will
+make your model less debuggable; error messages will reference
+expressions that have been extensively rewritten, some variables
+will have been removed entirely or merged with other identical
+expressions, and the generated code may not be obviously
+connected to the original code.}
+
+\item{substitutions}{Optionally, a list of values to substitute
+into model specification as constants, even though they are
+declared as \code{user()}. This will be most useful in conjunction
+with \code{rewrite_dims} to create a copy of your model with
+dimensions known at compile time and all loops using literal
+integers.}
 
 \item{options}{Named list of options.  If provided, then all other
 options are ignored.}
 }
+\value{
+A list of parameters, of class \code{odin_options}
+}
 \description{
-For lower-level odin functions \code{\link{odin_parse}},
-\code{\link{odin_validate}} we accept a list of options rather
+For lower-level odin functions \link{odin_parse},
+\link{odin_validate} we only accept a list of options rather
 than individually named options.
 }
 \examples{

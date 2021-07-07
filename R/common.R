@@ -7,6 +7,7 @@ STAGE_NULL <- 0L
 STAGE_CONSTANT <- 1L
 STAGE_USER <- 2L
 STAGE_TIME <- 3L
+STAGE_NAME <- c("null", "constant", "user", "time")
 
 TIME <- "t"
 STEP <- "step"
@@ -24,8 +25,18 @@ SPECIAL_LHS <- c("initial", "deriv", "update", "output", "dim", "config")
 SPECIAL_RHS <- c("user", "interpolate", "delay")
 INDEX <- c("i", "j", "k", "l", "i5", "i6", "i7", "i8") # TODO: make open
 INTERNAL <- "internal"
+
+## Keyword list from:
+## http://en.cppreference.com/w/c/keyword
+RESERVED_C <-
+  c("auto", "break", "case", "char", "const", "continue", "default",
+    "do", "double", "else", "enum", "extern", "float", "for", "goto",
+    "if", "inline", "int", "long", "register", "restrict", "return",
+    "short", "signed", "sizeof", "static", "struct", "switch", "typedef",
+    "union", "unsigned", "void", "volatile", "while")
+
 RESERVED <- c(INDEX, TIME, STEP, STATE, DSTATEDT, STATE_NEXT, USER,
-              SPECIAL_LHS, "delay", "dde", INTERNAL)
+              SPECIAL_LHS, "delay", "dde", INTERNAL, RESERVED_C)
 RESERVED_PREFIX <- c(SPECIAL_LHS, "odin", "offset", "delay", "interpolate")
 VALID_ARRAY <- c("-", "+", ":", "(", "length", "dim", "[", "as.integer")
 INTERPOLATION_TYPES <- c("constant", "linear", "spline")
@@ -95,6 +106,7 @@ FUNCTIONS <- list(
   floor = 1L,
   ceil = 1L,
   as.integer = 1L,
+  as.numeric = 1L,
   ## Big pile of trig:
   cos = 1L,   sin = 1L,   tan = 1L,
   acos = 1L,  asin = 1L,  atan = 1L,  atan2 = 2L,

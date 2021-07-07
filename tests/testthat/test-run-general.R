@@ -1,16 +1,14 @@
-context("run: %TARGET%: general")
+context("run: general")
 
 ## TODO: these should be split up eventually
 
 ## Tests of the approach against some known models.
-test_that("constant model", {
+test_that_odin("constant model", {
   gen <- odin({
     deriv(y) <- 0.5
     initial(y) <- 1
   })
-  mod <- gen()
-  expect_identical(r6_private(mod)$init, 1.0)
-  expect_identical(mod$deriv(0.0, r6_private(mod)$init), 0.5)
+  mod <- gen$new()
 
   tt <- seq(0, 10, length.out = 11)
   yy <- mod$run(tt)
@@ -20,7 +18,7 @@ test_that("constant model", {
   expect_null(colnames(mod$run(tt, use_names = FALSE)))
 })
 
-test_that("user variables", {
+test_that_odin("user variables", {
   gen <- odin({
     deriv(N) <- r * N * (1 - N / K)
     initial(N) <- N0
@@ -30,10 +28,10 @@ test_that("user variables", {
   })
 
   ## Two different errors when r is not provided:
-  expect_error(gen(), 'argument "r" is missing')
-  expect_error(gen(NULL), "Expected a value for 'r'")
+  expect_error(gen$new(), "Expected a value for 'r'")
+  expect_error(gen$new(r = NULL), "Expected a value for 'r'")
 
-  mod <- gen(pi)
+  mod <- gen$new(r = pi)
   dat <- mod$contents()
   expect_equal(dat$r, pi)
   expect_equal(dat$N0, 1.0)
@@ -58,20 +56,19 @@ test_that("user variables", {
   expect_equal(mod$contents()$N0, 5.0)
 })
 
-test_that("user variables on models with none", {
-  gen <- odin({
+test_that_odin("user variables on models with none", {
+  gen <- odin::odin({
     a <- 1
     deriv(y) <- 0.5 * a
     initial(y) <- 1
   })
-  expect_error(gen(a = 1), "unused argument")
-  mod <- gen()
+  mod <- gen$new()
   ## NOTE: This is a change of behaviour, but that's probably OK
   expect_silent(mod$set_user())
   expect_warning(mod$set_user(a = 1), "Unknown user parameters: a")
 })
 
-test_that("non-numeric time", {
+test_that_odin("non-numeric time", {
   ## Only an issue for delay models or models with time-dependent
   ## initial conditions.
   gen <- odin({
@@ -79,20 +76,20 @@ test_that("non-numeric time", {
     initial(y) <- 0.5
     deriv(y) <- 0.2 * ylag * 1 / (1 + ylag^10) - 0.1 * y
   })
-  mod <- gen()
+  mod <- gen$new()
   t <- as.integer(0:10)
-  expect_equal(mod$initial(t), 0.5)
+  expect_equal(mod$initial(t[1]), 0.5)
   expect_silent(mod$run(t))
 })
 
-test_that("delays and initial conditions", {
+test_that_odin("delays and initial conditions", {
   gen <- odin({
     ylag <- delay(y, 10)
     initial(y) <- 0.5
     deriv(y) <- 0.2 * ylag * 1 / (1 + ylag^10) - 0.1 * y
   })
 
-  mod <- gen()
+  mod <- gen$new()
   t <- as.integer(0:10)
   res1 <- mod$run(t)
 
@@ -118,7 +115,7 @@ test_that("delays and initial conditions", {
   expect_false(isTRUE(all.equal(res4[, 2], res1[, 2])))
 })
 
-test_that("non-numeric user", {
+test_that_odin("non-numeric user", {
   gen <- odin({
     deriv(N) <- r * N * (1 - N / K)
     initial(N) <- N0
@@ -126,32 +123,32 @@ test_that("non-numeric user", {
     K <- user(100)
     r <- user()
   })
-  mod <- gen(1L)
+  mod <- gen$new(r = 1L)
   expect_is(mod$contents()$r, "numeric")
   expect_identical(mod$contents()$r, 1.0)
 })
 
-test_that("conditionals", {
+test_that_odin("conditionals", {
   gen <- odin({
     deriv(x) <- if (x > 2) 0 else 0.5
     initial(x) <- 0
   })
 
   ## Hey ho it works:
-  mod <- gen()
+  mod <- gen$new()
   t <- seq(0, 5, length.out = 101)
   y <- mod$run(t)
 
   expect_equal(y[, 2], ifelse(t < 4, t * 0.5, 2.0), tolerance = 1e-5)
 })
 
-test_that("conditionals, precendence", {
+test_that_odin("conditionals, precendence", {
   gen <- odin({
     deriv(x) <- 0.1 + 2 * if (t > 2) -0.1 else 0.5
     initial(x) <- 0
   })
 
-  mod <- gen()
+  mod <- gen$new()
   t <- seq(0, 5, length.out = 101)
   y <- mod$run(t)
 
@@ -159,7 +156,7 @@ test_that("conditionals, precendence", {
   expect_equal(y[, 2], cmp, tolerance = 1e-5)
 })
 
-test_that("time dependent", {
+test_that_odin("time dependent", {
   ## A time dependent initial condition:
   gen_t <- odin({
     deriv(N) <- r * N * (1 - N / K)
@@ -178,18 +175,18 @@ test_that("time dependent", {
     r <- 0.5
   })
 
-  mod_t <- gen_t()
+  mod_t <- gen_t$new()
   expect_equal(mod_t$initial(0), 1)
   expect_equal(mod_t$initial(10), sqrt(10) + 1)
 
   t0 <- seq(0,  10, length.out = 101)
   t1 <- seq(10, 10, length.out = 101)
 
-  expect_equal(mod_t$run(t0), gen_cmp(sqrt(t0[[1]]) + 1)$run(t0))
-  expect_equal(mod_t$run(t1), gen_cmp(sqrt(t1[[1]]) + 1)$run(t1))
+  expect_equal(mod_t$run(t0), gen_cmp$new(N0 = sqrt(t0[[1]]) + 1)$run(t0))
+  expect_equal(mod_t$run(t1), gen_cmp$new(N0 = sqrt(t1[[1]]) + 1)$run(t1))
 })
 
-test_that("time dependent initial conditions", {
+test_that_odin("time dependent initial conditions", {
   gen <- odin({
     y1 <- sin(t)
     deriv(y2) <- y1
@@ -197,14 +194,14 @@ test_that("time dependent initial conditions", {
     output(y1) <- y1
   })
 
-  mod <- gen()
+  mod <- gen$new()
   t <- seq(0, 2 * pi, length.out = 101)
   y <- mod$run(t, atol = 1e-8, rtol = 1e-8)
   expect_identical(y[, 3L], sin(t))
   expect_equal(y[, 2L], cos(t + pi), tolerance = 1e-6)
 })
 
-test_that("user c", {
+test_that_odin("user c", {
   skip_for_target("r")
   gen <- odin({
     config(include) <- "user_fns.c"
@@ -214,7 +211,7 @@ test_that("user c", {
     initial(y) <- 0
   })
 
-  mod <- gen()
+  mod <- gen$new()
   t <- seq(0, 3, length.out = 301)
   y <- mod$run(t)
 
@@ -225,7 +222,29 @@ test_that("user c", {
   expect_equal(y[, 2L], cmp, tolerance = 1e-5)
 })
 
-test_that("user c in subdir", {
+test_that_odin("user r", {
+  ## mrc-2027 would minimise duplication here
+  skip_for_target("c")
+  gen <- odin({
+    config(include) <- "user_fns.R"
+    z <- squarepulse(t, 1, 2)
+    output(z) <- z
+    deriv(y) <- z
+    initial(y) <- 0
+  })
+
+  mod <- gen$new()
+  t <- seq(0, 3, length.out = 301)
+  y <- mod$run(t)
+
+  expect_equal(y[, 3L], as.numeric(t >= 1 & t < 2))
+  cmp <- -1 + t
+  cmp[t < 1] <- 0
+  cmp[t > 2] <- 1
+  expect_equal(y[, 2L], cmp, tolerance = 1e-5)
+})
+
+test_that_odin("user c in subdir", {
   skip_for_target("r")
   dest <- tempfile()
   dir.create(dest)
@@ -245,7 +264,7 @@ test_that("user c in subdir", {
   gen <- odin_(test)
 
   ## copied from above:
-  mod <- gen()
+  mod <- gen$new()
   t <- seq(0, 3, length.out = 301)
   y <- mod$run(t)
 
@@ -256,7 +275,7 @@ test_that("user c in subdir", {
   expect_equal(y[, 2L], cmp, tolerance = 1e-5)
 })
 
-test_that("time dependent initial conditions", {
+test_that_odin("time dependent initial conditions", {
   gen <- odin({
     y1 <- cos(t)
     y2 <- y1 * (1 + t)
@@ -266,7 +285,7 @@ test_that("time dependent initial conditions", {
     output(y2) <- y2
   })
 
-  mod <- gen()
+  mod <- gen$new()
 
   ## Initial conditions get through here:
   expect_equivalent(mod$initial(0), 1)
@@ -279,7 +298,7 @@ test_that("time dependent initial conditions", {
   expect_equal(as.vector(y[length(t), 2]), 1.0, tolerance = 1e-7)
 })
 
-test_that("time dependent initial conditions depending on vars", {
+test_that_odin("time dependent initial conditions depending on vars", {
   gen <- odin({
     v1 <- exp(-t)
 
@@ -293,13 +312,13 @@ test_that("time dependent initial conditions depending on vars", {
     initial(y3) <- y1 + y2
   })
 
-  mod <- gen()
+  mod <- gen$new()
   expect_equal(mod$initial(0), c(1, 2, 3))
   expect_equal(mod$initial(1), c(1, 1 + exp(-1), 2 + exp(-1)))
 })
 
 ## This test case kindly contributed by @blackedder in #14
-test_that("unused variable in output", {
+test_that_odin("unused variable in output", {
   gen <- odin({
     initial(S) <- N - I0
     initial(E1) <- 0
@@ -324,20 +343,20 @@ test_that("unused variable in output", {
 
     output(tot) <- S + E1 + E2 + I1 + I2 + R
   })
-  mod <- gen()
+  mod <- gen$new()
   expect_is(mod, "odin_model")
   t <- seq(0, 10, length.out = 100)
   expect_error(mod$run(t), NA)
 })
 
-test_that("3d array", {
+test_that_odin("3d array", {
   gen <- odin({
     initial(y[, , ]) <- 1
     deriv(y[, , ]) <- y[i, j, k] * 0.1
     dim(y) <- c(2, 3, 4)
   })
-  mod <- gen()
-  expect_equal(mod$initial(), rep(1.0, 2 * 3 * 4))
+  mod <- gen$new()
+  expect_equal(mod$initial(0), rep(1.0, 2 * 3 * 4))
 
   tt <- seq(0, 10, length.out = 11)
   yy <- mod$run(tt)
@@ -358,7 +377,7 @@ test_that("3d array", {
                c(setNames(list(tt[1]), TIME), list(y = array(1, c(2, 3, 4)))))
 })
 
-test_that("4d array", {
+test_that_odin("4d array", {
   ## TODO: offset_y is saved here and is not really needed.
   gen <- odin({
     initial(y[, , , ]) <- 1
@@ -366,15 +385,15 @@ test_that("4d array", {
     dim(y) <- c(2, 3, 4, 5)
   })
 
-  mod <- gen()
-  expect_equal(mod$initial(), rep(1.0, 2 * 3 * 4 * 5))
+  mod <- gen$new()
+  expect_equal(mod$initial(0), rep(1.0, 2 * 3 * 4 * 5))
   dat <- mod$contents()
   expect_equal(dat$initial_y, array(1, c(2, 3, 4, 5)))
 })
 
 ## I need a system with mixed variables and arrays for testing the
 ## parse code.  This is going to be a really stupid system!
-test_that("mixed", {
+test_that_odin("mixed", {
   gen <- odin({
     deriv(a) <- r * a
     initial(a) <- 1
@@ -385,7 +404,7 @@ test_that("mixed", {
     dim(v) <- 3
     r <- 0.1
   })
-  mod <- gen()
+  mod <- gen$new()
   expect_is(mod, "odin_model")
   t <- seq(0, 10, length.out = 100)
   y <- mod$run(t)
@@ -423,7 +442,7 @@ test_that("mixed", {
 ## Output array
 ##
 ## (1) A new array:
-test_that("output array", {
+test_that_odin("output array", {
   gen <- odin({
     deriv(y[]) <- r[i] * y[i]
     initial(y[]) <- 1
@@ -436,7 +455,7 @@ test_that("output array", {
     dim(y2) <- 3 # length(y) -- TODO -- should be OK?
   })
 
-  mod <- gen()
+  mod <- gen$new()
   tt <- seq(0, 10, length.out = 101)
   yy <- mod$run(tt)
 
@@ -450,7 +469,7 @@ test_that("output array", {
 })
 
 ## (2) An existing array
-test_that("output array", {
+test_that_odin("output array", {
   gen <- odin({
     deriv(y[]) <- r[i] * y[i]
     initial(y[]) <- 1
@@ -461,7 +480,7 @@ test_that("output array", {
     output(r[]) <- r
   })
 
-  mod <- gen()
+  mod <- gen$new()
   tt <- seq(0, 10, length.out = 101)
   yy <- mod$run(tt)
 
@@ -475,7 +494,7 @@ test_that("output array", {
 })
 
 
-test_that("use length on rhs", {
+test_that_odin("use length on rhs", {
   gen <- odin({
     deriv(y[]) <- r[i] * y[i]
     initial(y[]) <- 1
@@ -484,11 +503,11 @@ test_that("use length on rhs", {
     dim(r) <- length(y)
   })
 
-  mod <- gen()
+  mod <- gen$new()
   expect_equal(mod$contents()$r, rep(0.1, 3))
 })
 
-test_that("use dim on rhs", {
+test_that_odin("use dim on rhs", {
   gen <- odin({
     deriv(y[, ]) <- r[i] * y[i, j]
     initial(y[, ]) <- 1
@@ -497,7 +516,7 @@ test_that("use dim on rhs", {
     dim(r) <- dim(y, 1)
   })
 
-  mod <- gen()
+  mod <- gen$new()
   expect_equal(mod$contents()$r, rep(0.1, 3))
   expect_equal(mod$contents()$initial_y, matrix(1, 3, 4))
 })
@@ -505,7 +524,7 @@ test_that("use dim on rhs", {
 
 ## Ideally we'll end up with all combinations of has array/has scalar
 ## (there are 15 possible combinations though!)
-test_that("transform variables with output", {
+test_that_odin("transform variables with output", {
   gen <- odin({
     deriv(y[]) <- r[i] * y[i]
     initial(y[]) <- y0[i]
@@ -519,7 +538,7 @@ test_that("transform variables with output", {
 
   y0 <- runif(3)
   r <- runif(3)
-  mod <- gen(y0 = y0, r = r)
+  mod <- gen$new(y0 = y0, r = r)
 
   tt <- seq(0, 5, length.out = 101)
   real_y <- t(y0 * exp(outer(r, tt)))
@@ -533,7 +552,7 @@ test_that("transform variables with output", {
 })
 
 
-test_that("transform variables without time", {
+test_that_odin("transform variables without time", {
   gen <- odin({
     deriv(y[]) <- r[i] * y[i]
     initial(y[]) <- y0[i]
@@ -547,7 +566,7 @@ test_that("transform variables without time", {
 
   y0 <- runif(3)
   r <- runif(3)
-  mod <- gen(y0 = y0, r = r)
+  mod <- gen$new(y0 = y0, r = r)
 
   tt <- seq(0, 5, length.out = 101)
   yy <- mod$run(tt, atol = 1e-8, rtol = 1e-8)
@@ -571,7 +590,7 @@ test_that("transform variables without time", {
 })
 
 
-test_that("pathalogical array index", {
+test_that_odin("pathalogical array index", {
   gen <- odin({
     deriv(z) <- y1 + y2 + y3 + y4 + y5
     initial(z) <- 0
@@ -593,7 +612,7 @@ test_that("pathalogical array index", {
     y5 <- y[5 + (a - a)] # > y[5]
   })
 
-  dat <- gen()$contents()
+  dat <- gen$new()$contents()
   expect_equal(dat$y1, 1.0)
   expect_equal(dat$y2, 2.0)
   expect_equal(dat$y3, 3.0)
@@ -602,7 +621,7 @@ test_that("pathalogical array index", {
 })
 
 
-test_that("two output arrays", {
+test_that_odin("two output arrays", {
   gen <- odin({
     deriv(y[]) <- y[i] * r[i]
     initial(y[]) <- i
@@ -615,7 +634,7 @@ test_that("two output arrays", {
   })
 
   r <- runif(3)
-  mod <- gen(r = r)
+  mod <- gen$new(r = r)
   tt <- seq(0, 10, length.out = 101)
   yy <- mod$run(tt, atol = 1e-8, rtol = 1e-8)
   zz <- mod$transform_variables(yy)
@@ -638,14 +657,14 @@ test_that("two output arrays", {
     output(r[]) <- TRUE
   })
 
-  mod2 <- gen2(y0 = as.numeric(1:3), r = r)
+  mod2 <- gen2$new(y0 = as.numeric(1:3), r = r)
   res <- mod2$run(tt, atol = 1e-8, rtol = 1e-8)
   expect_equal(res, yy)
 })
 
 ## TODO: This still needs harmonising with get_user_array1 functions
 ## (non user dimensions) as they use coerceVector still.
-test_that("non-numeric input", {
+test_that_odin("non-numeric input", {
   gen <- odin({
     deriv(y) <- 1
     initial(y) <- 1
@@ -675,7 +694,7 @@ test_that("non-numeric input", {
   }
 
   ## First, this is all easy and has been well tested already:
-  mod <- gen(scalar = scalar,
+  mod <- gen$new(scalar = scalar,
              vector = vector,
              matrix = matrix,
              array = array,
@@ -689,7 +708,7 @@ test_that("non-numeric input", {
   expect_equal(dat$array4, array4)
 
   ## Then to integer first:
-  mod <- gen(scalar = convert(scalar),
+  mod <- gen$new(scalar = convert(scalar),
              vector = convert(vector),
              matrix = convert(matrix),
              array = convert(array),
@@ -703,35 +722,35 @@ test_that("non-numeric input", {
 
   ## Then test for errors on each as we convert to character:
   expect_error(
-    gen(scalar = convert(scalar, "character"),
+    gen$new(scalar = convert(scalar, "character"),
         vector = vector,
         matrix = matrix,
         array = array,
         array4 = array4),
     "Expected a numeric value for scalar")
   expect_error(
-    gen(scalar = scalar,
+    gen$new(scalar = scalar,
         vector = convert(vector, "character"),
         matrix = matrix,
         array = array,
         array4 = array4),
     "Expected a numeric value for vector")
   expect_error(
-    gen(scalar = scalar,
+    gen$new(scalar = scalar,
         vector = vector,
         matrix = convert(matrix, "character"),
         array = array,
         array4 = array4),
     "Expected a numeric value for matrix")
   expect_error(
-    gen(scalar = scalar,
+    gen$new(scalar = scalar,
         vector = vector,
         matrix = matrix,
         array = convert(array, "character"),
         array4 = array4),
     "Expected a numeric value for array")
   expect_error(
-    gen(scalar = scalar,
+    gen$new(scalar = scalar,
         vector = vector,
         matrix = matrix,
         array = array,
@@ -739,7 +758,7 @@ test_that("non-numeric input", {
     "Expected a numeric value for array4")
 })
 
-test_that("only used in output", {
+test_that_odin("only used in output", {
   gen <- odin({
     deriv(y[]) <- r[i] * y[i]
     initial(y[]) <- 1
@@ -753,14 +772,14 @@ test_that("only used in output", {
     dim(y2) <- length(y)
   })
 
-  mod <- gen()
+  mod <- gen$new()
   tt <- seq(0, 10, length.out = 101)
   res <- mod$transform_variables(mod$run(tt))
   expect_equal(res$ytot, rowSums(res$y))
   expect_equal(res$y2, res$y * 2)
 })
 
-test_that("overlapping graph", {
+test_that_odin("overlapping graph", {
   gen <- odin({
     deriv(y) <- y * p
     initial(y) <- 1
@@ -770,7 +789,7 @@ test_that("overlapping graph", {
     output(p3) <- p + p2
   }, verbose = FALSE)
 
-  mod <- gen()
+  mod <- gen$new()
   tt <- seq(0, 10, length.out = 101)
 
   f <- function(t, y, p) {
@@ -783,7 +802,7 @@ test_that("overlapping graph", {
   expect_equivalent(mod$run(tt), cmp)
 })
 
-test_that("sum over one dimension", {
+test_that_odin("sum over one dimension", {
   ## This does rowSums / colSums and will be important for building up
   ## towards a general sum.
   gen <- odin({
@@ -810,7 +829,7 @@ test_that("sum over one dimension", {
   nr <- 5
   nc <- 7
   m <- matrix(runif(nr * nc), nr, nc)
-  dat <- gen(m = m)$contents()
+  dat <- gen$new(m = m)$contents()
 
   expect_equal(dat$m, m)
   expect_equal(dat$v1, rowSums(m))
@@ -823,7 +842,7 @@ test_that("sum over one dimension", {
   expect_equal(dat$tot2, sum(m))
 })
 
-test_that("sum over two dimensions", {
+test_that_odin("sum over two dimensions", {
   ## This is where things get a bit more horrid:
   gen <- odin({
     deriv(y) <- 0
@@ -872,7 +891,7 @@ test_that("sum over two dimensions", {
   nc <- 7
   nz <- 9
   a <- array(runif(nr * nc * nz), c(nr, nc, nz))
-  dat <- gen(a = a)$contents()
+  dat <- gen$new(a = a)$contents()
 
   expect_equal(dat$a, a)
   expect_equal(dat$m12, apply(a, 1:2, sum))
@@ -895,7 +914,7 @@ test_that("sum over two dimensions", {
   expect_equal(dat$tot2, sum(a))
 })
 
-test_that("sum for a 4d array", {
+test_that_odin("sum for a 4d array", {
   ## I don't want to check absolutely everything here, so hopefully if
   ## these few go OK then given the more exhaustive tests above we'll
   ## be OK
@@ -920,7 +939,7 @@ test_that("sum for a 4d array", {
 
   dim <- c(3, 5, 7, 9)
   a <- array(runif(prod(dim)), dim)
-  dat <- gen(a = a)$contents()
+  dat <- gen$new(a = a)$contents()
 
   expect_equal(dat$a, a)
   expect_equal(dat$m12, apply(a, 1:2, sum))
@@ -928,7 +947,7 @@ test_that("sum for a 4d array", {
   expect_equal(dat$m24, apply(a, c(2, 4), sum))
 })
 
-test_that("sum initial condition from initial condition", {
+test_that_odin("sum initial condition from initial condition", {
   gen <- odin({
     update(a[, ]) <- 1
     update(b) <- 1
@@ -937,10 +956,10 @@ test_that("sum initial condition from initial condition", {
     n <- sum(a[1, ])
     dim(a) <- c(10, 10)
   })
-  expect_equal(gen()$initial(0), c(10, rep(1, 100)))
+  expect_equal(gen$new()$initial(0), c(10, rep(1, 100)))
 })
 
-test_that("another initial condition failure", {
+test_that_odin("another initial condition failure", {
   gen <- odin({
     deriv(a[]) <- 1
     deriv(b) <- 1
@@ -949,10 +968,10 @@ test_that("another initial condition failure", {
     n <- sum(a)
     dim(a) <- 10
   })
-  expect_equal(gen()$initial(0), c(10, rep(1, 10)))
+  expect_equal(gen$new()$initial(0), c(10, rep(1, 10)))
 })
 
-test_that("self output for scalar", {
+test_that_odin("self output for scalar", {
   gen <- odin({
     initial(a) <- 1
     deriv(a) <- 0
@@ -961,10 +980,10 @@ test_that("self output for scalar", {
   })
 
   tt <- seq(0, 10, length.out = 11)
-  expect_equal(gen()$run(tt)[, "x"], tt)
+  expect_equal(gen$new()$run(tt)[, "x"], tt)
 })
 
-test_that("non-time sentsitive output", {
+test_that_odin("non-time sentsitive output", {
   gen <- odin({
     initial(a) <- 1
     deriv(a) <- 0
@@ -973,10 +992,10 @@ test_that("non-time sentsitive output", {
   })
 
   tt <- seq(0, 10, length.out = 11)
-  expect_equal(gen()$run(tt)[, "x"], rep(1, length(tt)))
+  expect_equal(gen$new()$run(tt)[, "x"], rep(1, length(tt)))
 })
 
-test_that("logical operations", {
+test_that_odin("logical operations", {
   gen <- odin({
     initial(a) <- 1
     deriv(a) <- 0
@@ -993,7 +1012,7 @@ test_that("logical operations", {
   }, compiler_warnings = FALSE)
 
   t <- seq(0, 10, length.out = 101)
-  y <- gen()$run(t)
+  y <- gen$new()$run(t)
 
   expect_equal(y[, "x1"], as.numeric(t > 1 & t < 3))
   expect_equal(y[, "x2"], as.numeric(t > 1 | t < 3))
@@ -1006,7 +1025,7 @@ test_that("logical operations", {
 ## know how useful this is going to be.  I'll see if we can get away
 ## with this for now, and then go through and see if we can detect if
 ## a number is an integer thing because it's only used within indexes.
-test_that("integer vector", {
+test_that_odin("integer vector", {
   ## We expect 'idx' to come through as an integer
   gen <- odin({
     x[] <- user()
@@ -1021,17 +1040,17 @@ test_that("integer vector", {
   set.seed(1)
   idx <- sample(15)
   x <- runif(length(idx))
-  mod <- gen(x = x, idx = idx)
+  mod <- gen$new(x = x, idx = idx)
   dat <- mod$contents()
   expect_equal(dat$idx, idx)
   expect_equal(dat$initial_v, x[idx])
 
-  expect_equal(ir_deserialise(mod$ir)$data$elements$idx$storage_type,
+  expect_equal(ir_deserialise(mod$ir())$data$elements$idx$storage_type,
                "int")
 })
 
 ## This is much closer to the test case needed for Neil's model
-test_that("integer matrix", {
+test_that_odin("integer matrix", {
   gen <- odin({
     x[] <- user()
     dim(x) <- user()
@@ -1051,25 +1070,25 @@ test_that("integer matrix", {
   ## This is what the code should expand to:
   v <- x[idx[, 1]] + x[idx[, 2]] + x[idx[, 3]]
 
-  mod <- gen(x = x, idx = idx)
+  mod <- gen$new(x = x, idx = idx)
   expect_equal(mod$contents()$v, v)
-  expect_equal(ir_deserialise(mod$ir)$data$elements$idx$storage_type,
+  expect_equal(ir_deserialise(mod$ir())$data$elements$idx$storage_type,
                "int")
 })
 
-test_that("c in dim for vector", {
+test_that_odin("c in dim for vector", {
   ## This is a regression test for issue #61
   gen <- odin({
     initial(x[]) <- 1
     deriv(x[]) <- 0
     dim(x) <- c(5)
   })
-  mod <- gen()
+  mod <- gen$new()
   expect_equal(mod$contents()$initial_x, rep(1.0, 5))
 })
 
 
-test_that("user variable information", {
+test_that_odin("user variable information", {
   gen <- odin({
     deriv(N) <- r[1] * N * (1 - N / K)
     initial(N) <- N0
@@ -1081,15 +1100,14 @@ test_that("user variable information", {
 
   info <- coef(gen)
   expect_is(info, "data.frame")
-  expect_equal(info$name, names(formals(gen))[1:3])
   expect_equal(info$has_default, c(FALSE, TRUE, TRUE))
   expect_equal(info$rank, c(1L, 0L, 0L))
 
-  expect_identical(coef(gen(1)), info)
+  expect_identical(coef(gen$new(r = 1)), info)
 })
 
 
-test_that("user variable information - when no user", {
+test_that_odin("user variable information - when no user", {
   gen <- odin({
     deriv(N) <- r * N * (1 - N / K)
     initial(N) <- N0
@@ -1107,72 +1125,35 @@ test_that("user variable information - when no user", {
                     integer = logical(),
                     stringsAsFactors = FALSE)
   expect_identical(info, cmp)
-  expect_identical(coef(gen()), cmp)
+  expect_identical(coef(gen$new()), cmp)
 })
 
 
-test_that("format/print", {
-  gen <- odin({
-    deriv(N) <- r[1] * N * (1 - N / K)
-    initial(N) <- N0
-    N0 <- user(1)
-    K <- user(100)
-    r[] <- user()
-    dim(r) <- 1
-  })
-
-  txt <- capture.output(x <- withVisible(print(gen)))
-  expect_match(txt,
-               capture.output(args(gen))[[1]],
-               fixed = TRUE, all = FALSE)
-  expect_match(txt,
-               "<an 'odin_generator' function>",
-               fixed = TRUE, all = FALSE)
-  expect_match(txt,
-               "use coef() to get information on user parameters",
-               fixed = TRUE, all = FALSE)
-
-  expect_identical(x, list(value = gen, visible = FALSE))
-})
-
-
-test_that("ir is read-only", {
-  gen <- odin({
-    deriv(y) <- 0.5
-    initial(y) <- 1
-  })
-  mod <- gen()
-  ir <- mod$ir
-  expect_error(mod$ir <- TRUE)
-  expect_identical(mod$ir, ir)
-})
-
-
-test_that("multiline string", {
+test_that_odin("multiline string", {
   ## Literal multiline string:
   gen <- odin(c("deriv(y) <- 0.5", "initial(y) <- 1"))
-  expect_is(gen(), "odin_model")
+  expect_is(gen$new(), "odin_model")
 })
 
 
 ## This is basically all ok but what is still not great is _doing_ the
 ## validation.
-test_that("user integer", {
+test_that_odin("user integer", {
   gen <- odin({
     deriv(y) <- 0.5
     initial(y) <- y0
     y0 <- user(1, integer = TRUE, min = 0)
   })
 
-  expect_error(gen(y0 = 1.5), "Expected 'y0' to be integer-like")
-  expect_error(gen(y0 = -1L), "Expected 'y0' to be at least 0")
+  expect_error(gen$new(y0 = 1.5), "Expected 'y0' to be integer-like")
+  expect_error(gen$new(y0 = -1L), "Expected 'y0' to be at least 0")
 
-  expect_error(mod <- gen(y0 = 1), NA)
+  expect_error(mod <- gen$new(y0 = 1), NA)
   expect_equal(mod$run(0:10)[, "y"], 1.0 + 0.5 * (0:10))
 })
 
 
-test_that("multiple constraints", {
+test_that_odin("multiple constraints", {
   gen <- odin({
     deriv(y) <- r
     initial(y) <- y0
@@ -1180,12 +1161,12 @@ test_that("multiple constraints", {
     r <- user(0.5, max = 10)
   })
 
-  expect_error(gen(y0 = -1L), "Expected 'y0' to be at least 0")
-  expect_error(gen(r = 100), "Expected 'r' to be at most 10")
+  expect_error(gen$new(y0 = -1L), "Expected 'y0' to be at least 0")
+  expect_error(gen$new(r = 100), "Expected 'r' to be at most 10")
 })
 
 
-test_that("set_user honours constraints", {
+test_that_odin("set_user honours constraints", {
   gen <- odin({
     deriv(y) <- r
     initial(y) <- y0
@@ -1193,13 +1174,13 @@ test_that("set_user honours constraints", {
     r <- user(0.5, max = 10)
   })
 
-  mod <- gen()
+  mod <- gen$new()
   expect_error(mod$set_user(y0 = -1L), "Expected 'y0' to be at least 0")
   expect_error(mod$set_user(r = 100), "Expected 'r' to be at most 10")
 })
 
 
-test_that("user sized dependent variables are allowed", {
+test_that_odin("user sized dependent variables are allowed", {
   gen <- odin({
     deriv(y[]) <- r[i] * y[i]
     initial(y[]) <- 1
@@ -1208,13 +1189,13 @@ test_that("user sized dependent variables are allowed", {
     dim(y) <- length(r)
   })
   r <- runif(3)
-  mod <- gen(r = r)
+  mod <- gen$new(r = r)
   expect_identical(mod$contents()$r, r)
   expect_identical(mod$contents()$initial_y, rep(1.0, length(r)))
 })
 
 
-test_that("user parameter validation", {
+test_that_odin("user parameter validation", {
   gen <- odin({
     deriv(y) <- r
     initial(y) <- 1
@@ -1223,20 +1204,20 @@ test_that("user parameter validation", {
 
   ## Honour all the options:
   expect_error(
-    gen(user = list(r = 1, a = 1), unused_user_action = "stop"),
+    gen$new(user = list(r = 1, a = 1), unused_user_action = "stop"),
     "Unknown user parameters: a")
   expect_warning(
-    gen(user = list(r = 1, a = 1), unused_user_action = "warning"),
+    gen$new(user = list(r = 1, a = 1), unused_user_action = "warning"),
     "Unknown user parameters: a")
   expect_message(
-    gen(user = list(r = 1, a = 1), unused_user_action = "message"),
+    gen$new(user = list(r = 1, a = 1), unused_user_action = "message"),
     "Unknown user parameters: a")
   expect_silent(
-    gen(user = list(r = 1, a = 1), unused_user_action = "ignore"))
+    gen$new(user = list(r = 1, a = 1), unused_user_action = "ignore"))
 
   ## Sensible error message for invalid option
   expect_error(
-    gen(user = list(r = 1, a = 1), unused_user_action = "other"),
+    gen$new(user = list(r = 1, a = 1), unused_user_action = "other"),
     "Unknown user parameters: a (and invalid value for unused_user_action)",
     fixed = TRUE)
 
@@ -1244,25 +1225,25 @@ test_that("user parameter validation", {
   with_options(
     list(odin.unused_user_action = "message"),
     expect_message(
-      gen(user = list(r = 1, a = 1)),
+      gen$new(user = list(r = 1, a = 1)),
       "Unknown user parameters: a"))
 
   ## Override option
   with_options(
     list(odin.unused_user_action = "message"),
     expect_error(
-      gen(user = list(r = 1, a = 1), unused_user_action = "error"),
+      gen$new(user = list(r = 1, a = 1), unused_user_action = "error"),
       "Unknown user parameters: a"))
 
   ## System default:
   with_options(
     list(odin.unused_user_action = NULL),
     expect_warning(
-      gen(user = list(r = 1, a = 1)),
+      gen$new(user = list(r = 1, a = 1)),
       "Unknown user parameters: a"))
 
   ## set_user:
-  mod <- gen(r = 1)
+  mod <- gen$new(r = 1)
   expect_silent(
     mod$set_user(user = list(x = 1), unused_user_action = "ignore"))
   expect_error(
@@ -1270,7 +1251,7 @@ test_that("user parameter validation", {
     "Unknown user parameters: x")
 })
 
-test_that("sum over integer", {
+test_that_odin("sum over integer", {
   gen <- odin({
     x[] <- user()
     dim(x) <- user()
@@ -1284,7 +1265,7 @@ test_that("sum over integer", {
   set.seed(1)
   idx <- sample(15)
   x <- runif(length(idx))
-  mod <- gen(x = x, idx = idx)
+  mod <- gen$new(x = x, idx = idx)
   dat <- mod$contents()
   expect_equal(dat$idx, idx)
   expect_equal(dat$initial_v, x[idx])
@@ -1293,7 +1274,7 @@ test_that("sum over integer", {
 })
 
 
-test_that("force integer on use", {
+test_that_odin("force integer on use", {
   gen <- odin({
     vec[] <- i
     dim(vec) <- 2
@@ -1302,14 +1283,14 @@ test_that("force integer on use", {
     initial(x) <- 0
   })
 
-  mod <- gen()
+  mod <- gen$new()
   t <- seq(0, 10, length.out = 101)
   y <- mod$run(t, atol = 1e-9, rtol = 1e-9)
   expect_equal(y[, 2], ifelse(t <= 5, t, 2 * t - 5))
 })
 
 
-test_that("force integer on a numeric vector truncates", {
+test_that_odin("force integer on a numeric vector truncates", {
   gen <- odin({
     vec[] <- i
     dim(vec) <- 10
@@ -1318,7 +1299,65 @@ test_that("force integer on a numeric vector truncates", {
     deriv(x) <- 0
   })
 
-  expect_equal(gen(idx = 1.5)$initial(), 1)
-  expect_equal(gen(idx = 3 - 1e-8)$initial(), 2)
-  expect_equal(gen(idx = 3 + 1e-8)$initial(), 3)
+  expect_equal(gen$new(idx = 1.5)$initial(0), 1)
+  expect_equal(gen$new(idx = 3 - 1e-8)$initial(0), 2)
+  expect_equal(gen$new(idx = 3 + 1e-8)$initial(0), 3)
+})
+
+
+test_that_odin("user c functions can be passed arrays and indexes", {
+  skip_for_target("r")
+  gen <- odin({
+    config(include) <- "user_fns4.c"
+    n <- 5
+    x[] <- user()
+    y[] <- f(i, x)
+    dim(x) <- n
+    dim(y) <- n
+    output(y) <- TRUE
+    initial(a) <- 0
+    deriv(a) <- 0
+  })
+
+  x <- runif(5)
+  mod <- gen$new(user = list(x = x))
+  y <- mod$run(c(0, 1))
+  expect_equal(mod$transform_variables(y[2, ])$y, cumsum(x))
+})
+
+
+test_that_odin("self output for scalar: rewrite corner case", {
+  gen <- odin({
+    initial(a) <- 1
+    deriv(a) <- 0
+    x <- 2 + 5
+    output(x) <- TRUE
+  })
+
+  tt <- seq(0, 10, length.out = 11)
+  expect_equal(gen$new()$run(tt)[, "x"], rep(7, 11))
+})
+
+
+test_that_odin("deprecation warning finds used constructor name", {
+  gen <- odin({
+    deriv(y) <- r
+    initial(y) <- 1
+    r <- 2
+    config(base) <- "mymodel"
+  })
+  expect_warning(gen(), "'gen(...)' is deprecated", fixed = TRUE)
+  expect_warning(local(gen()), "'gen(...)' is deprecated", fixed = TRUE)
+  expect_silent(gen$new())
+})
+
+
+test_that_odin("deprecation warning falls back on base name", {
+  code <- c("deriv(y) <- r",
+            "initial(y) <- 1",
+            "r <- 2",
+            "config(base) <- 'mymodel'")
+  expect_warning(odin_(code)(), "'mymodel(...)' is deprecated",
+                 fixed = TRUE)
+  expect_silent(odin_(code)$new())
 })

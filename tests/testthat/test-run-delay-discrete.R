@@ -1,13 +1,13 @@
-context("run: %TARGET%: discrete delays")
+context("run: discrete delays")
 
-test_that("delays", {
+test_that_odin("delays", {
   gen <- odin({
     initial(y) <- 1
     update(y) <- y + yprev
     yprev <- delay(y, 1)
   })
 
-  mod <- gen()
+  mod <- gen$new()
 
   tt <- seq(0:10)
   yy <- mod$run(tt)
@@ -16,7 +16,7 @@ test_that("delays", {
 
 ## This also catches a corner case in the inclusion of sum() in the
 ## headers.
-test_that("delays: scalar variable", {
+test_that_odin("delays: scalar variable", {
   gen <- odin({
     r <- 3.6
     update(y) <- r * y * (1 - y)
@@ -25,13 +25,14 @@ test_that("delays: scalar variable", {
     output(x) <- TRUE
   })
 
-  mod <- gen()
+  mod <- gen$new()
   tt <- seq(0:20)
   yy <- mod$transform_variables(mod$run(tt))
 
   ## Check that the underlying data are correct:
   dat <- mod$contents()
-  cmp <- logistic_map(dat$r, dat$initial_y, diff(range(tt)))
+  cmp <- logistic_map(3.6, dat$initial_y, diff(range(tt)))
+  expect_equal(yy$y, drop(cmp))
 
   ## Then check the delayed expression:
   i <- seq_len(length(tt) - 2)
@@ -39,7 +40,7 @@ test_that("delays: scalar variable", {
   expect_equal(yy$x[1:2], rep(0.2, 2))
 })
 
-test_that("delays: scalar expression", {
+test_that_odin("delays: scalar expression", {
   gen <- odin({
     r <- 3.6
     update(y[]) <- r * y[i] * (1 - y[i])
@@ -50,20 +51,21 @@ test_that("delays: scalar expression", {
     dim(y) <- 2
   })
 
-  mod <- gen()
+  mod <- gen$new()
   tt <- seq(0:20)
   yy <- mod$transform_variables(mod$run(tt))
 
   ## Check that the underlying data are correct:
   dat <- mod$contents()
-  cmp <- logistic_map(dat$r, dat$initial_y, diff(range(tt)))
+  cmp <- logistic_map(3.6, dat$initial_y, diff(range(tt)))
+  expect_equal(yy$y, cmp)
 
   ## Then check the delayed expression:
   i <- seq_len(length(tt) - 2)
   expect_equal(yy$x[i + 2], rowMeans(yy$y[i, ]))
 })
 
-test_that("delays: vector variable", {
+test_that_odin("delays: vector variable", {
   gen <- odin({
     r <- 3.6
     update(y[]) <- r * y[i] * (1 - y[i])
@@ -75,13 +77,14 @@ test_that("delays: vector variable", {
     dim(x) <- 2
   })
 
-  mod <- gen()
+  mod <- gen$new()
   tt <- seq(0:20)
   yy <- mod$transform_variables(mod$run(tt))
 
   ## Check that the underlying data are correct:
   dat <- mod$contents()
-  cmp <- logistic_map(dat$r, dat$initial_y, diff(range(tt)))
+  cmp <- logistic_map(3.6, dat$initial_y, diff(range(tt)))
+  expect_equal(yy$y, cmp)
 
   ## Then check the delayed expression:
   i <- seq_len(length(tt) - 2)
@@ -89,7 +92,7 @@ test_that("delays: vector variable", {
   expect_equal(yy$x[1:2, ], matrix(rep(c(0.2, 0.4), 2), 2, 2, TRUE))
 })
 
-test_that("delays: vector expression", {
+test_that_odin("delays: vector expression", {
   gen <- odin({
     r <- 3.6
     update(y[]) <- r * y[i] * (1 - y[i])
@@ -101,13 +104,13 @@ test_that("delays: vector expression", {
     dim(y) <- 2
   })
 
-  mod <- gen()
+  mod <- gen$new()
   tt <- seq(0:20)
   yy <- mod$transform_variables(mod$run(tt))
 
   ## Check that the underlying data are correct:
   dat <- mod$contents()
-  cmp <- logistic_map(dat$r, dat$initial_y, diff(range(tt)))
+  cmp <- logistic_map(3.6, dat$initial_y, diff(range(tt)))
   expect_equal(yy$y, cmp)
 
   ## Then check the delayed expression:
@@ -115,7 +118,7 @@ test_that("delays: vector expression", {
   expect_equal(yy$x[i + 2, ], yy$y[i, ] / rowSums(yy$y[i, ]))
 })
 
-test_that("delay vars that depend on time", {
+test_that_odin("delay vars that depend on time", {
   gen <- odin({
     initial(x) <- 0
     update(x) <- x + v
@@ -125,7 +128,7 @@ test_that("delay vars that depend on time", {
     output(y) <- TRUE
   })
 
-  mod <- gen()
+  mod <- gen$new()
   tt <- 0:10
   yy <- mod$run(tt)
 
@@ -134,21 +137,22 @@ test_that("delay vars that depend on time", {
 })
 
 
-test_that("disable update function", {
+test_that_odin("disable update function", {
   gen <- odin({
     initial(y) <- 1
     update(y) <- y + yprev
     yprev <- delay(y, 1)
   })
 
-  mod <- gen()
-  expect_error(mod$update(0),
+  mod <- gen$new()
+  y <- mod$initial(0)
+  expect_error(mod$update(0, y),
                "Can't call update() on delay models",
                fixed = TRUE)
 })
 
 
-test_that("default (scalar)", {
+test_that_odin("default (scalar)", {
   skip_for_target("c")
   gen <- odin({
     r <- 3.6
@@ -158,13 +162,14 @@ test_that("default (scalar)", {
     output(x) <- TRUE
   })
 
-  mod <- gen()
+  mod <- gen$new()
   tt <- 0:10
   yy <- mod$transform_variables(mod$run(tt))
 
   ## Check that the underlying data are correct:
   dat <- mod$contents()
-  cmp <- logistic_map(dat$r, dat$initial_y, diff(range(tt)))
+  cmp <- logistic_map(3.6, dat$initial_y, diff(range(tt)))
+  expect_equal(yy$y, drop(cmp))
 
   ## Then check the delayed expression:
   i <- seq_len(length(tt) - 2)
@@ -173,7 +178,7 @@ test_that("default (scalar)", {
 })
 
 
-test_that("default (vector)", {
+test_that_odin("default (vector)", {
   skip_for_target("c")
   gen <- odin({
     r <- 3.6
@@ -189,13 +194,14 @@ test_that("default (vector)", {
   })
 
   z <- c(0.3, 0.6)
-  mod <- gen(z = z)
+  mod <- gen$new(z = z)
   tt <- seq(0:20)
   yy <- mod$transform_variables(mod$run(tt))
 
   ## Check that the underlying data are correct:
   dat <- mod$contents()
-  cmp <- logistic_map(dat$r, dat$initial_y, diff(range(tt)))
+  cmp <- logistic_map(3.6, dat$initial_y, diff(range(tt)))
+  expect_equal(yy$y, cmp)
 
   ## Then check the delayed expression:
   i <- seq_len(length(tt) - 2)

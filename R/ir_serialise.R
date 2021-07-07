@@ -19,11 +19,16 @@ ir_serialise_version <- function(version) {
 
 
 ir_serialise_config <- function(config) {
-  include <- lapply(unname(config$include), function(x)
-    list(name = scalar(x$name),
-         declaration = x$declaration,
-         definition = x$definition))
-  list(base = scalar(config$base), include = include)
+  custom <- config$custom
+  if (!is.null(config$custom)) {
+    for (i in seq_along(custom)) {
+      custom[[i]]$name <- scalar(custom[[i]]$name)
+      custom[[i]]$value <- scalar(custom[[i]]$value)
+    }
+  }
+  list(base = scalar(config$base),
+       include = config$include,
+       custom = custom)
 }
 
 
@@ -67,7 +72,10 @@ ir_serialise_data <- function(data) {
     } else {
       ret$dimnames <- x$dimnames
       ret$dimnames$length <- ir_serialise_expression(x$dimnames$length)
+      ret$dimnames$dim <- lapply(ret$dimnames$dim, ir_serialise_expression)
+      ret$dimnames$mult <- lapply(ret$dimnames$mult, ir_serialise_expression)
     }
+    ret$stage <- scalar(STAGE_NAME[x$stage + 1L])
     ret
   }
   ## TODO: this can be modified later on when we move initial out of

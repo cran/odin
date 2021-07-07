@@ -99,3 +99,122 @@ test_that("counter works", {
   obj$reset()
   expect_equal(obj$get(), 0L)
 })
+
+
+test_that("Can avoid debug in compile_dll", {
+  skip_if_not_installed("mockery")
+  skip_on_cran()
+
+  mock_has_user_makevars <- mockery::mock(FALSE)
+  mock_compile_dll <- mockery::mock(
+    list(Sys.getenv("R_MAKEVARS_USER"), pkgbuild:::makevars_user()))
+
+  path <- tempfile()
+  compile_attributes <- TRUE
+  quiet <- FALSE
+  res <- with_mock(
+    "odin::has_user_makevars" = mock_has_user_makevars,
+    "pkgbuild::compile_dll" = mock_compile_dll,
+    compile_dll(path, compile_attributes, quiet))
+
+  expect_equal(res[[1]], res[[2]])
+  expect_equal(normalizePath(dirname(res[[1]])),
+               normalizePath(tempdir()))
+
+  mockery::expect_called(mock_has_user_makevars, 1)
+  mockery::expect_called(mock_compile_dll, 1)
+  expect_equal(
+    mockery::mock_args(mock_compile_dll)[[1]],
+    list(path, compile_attributes, quiet))
+})
+
+
+test_that("Don't set envvar if not needed", {
+  skip_if_not_installed("mockery")
+
+  env <- c("R_MAKEVARS_USER" = NA)
+  cmp <- withr::with_envvar(
+    env,
+    pkgbuild:::makevars_user())
+
+  mock_has_user_makevars <- mockery::mock(TRUE)
+  mock_compile_dll <- mockery::mock(
+    list(Sys.getenv("R_MAKEVARS_USER"), pkgbuild:::makevars_user()))
+
+  path <- tempfile()
+  compile_attributes <- TRUE
+  quiet <- FALSE
+
+  res <- withr::with_envvar(
+    env,
+    with_mock(
+      "odin::has_user_makevars" = mock_has_user_makevars,
+      "pkgbuild::compile_dll" = mock_compile_dll,
+      compile_dll(path, compile_attributes, quiet)))
+
+  expect_equal(res[[1]], "")
+  expect_equal(res[[2]], cmp)
+
+  mockery::expect_called(mock_has_user_makevars, 1)
+  mockery::expect_called(mock_compile_dll, 1)
+  expect_equal(
+    mockery::mock_args(mock_compile_dll)[[1]],
+    list(path, compile_attributes, quiet))
+})
+
+
+test_that("validate inputs", {
+  expect_silent(assert_scalar_logical_or_null(NULL))
+  expect_silent(assert_scalar_logical_or_null(TRUE))
+  expect_silent(assert_scalar_logical_or_null(FALSE))
+
+  thing <- "true"
+  expect_error(
+    assert_scalar_logical_or_null(thing),
+    "Expected 'thing' to be a logical scalar (or NULL)",
+    fixed = TRUE)
+  expect_error(assert_scalar_logical_or_null(NA),
+               "Expected '.+' to be a logical scalar \\(or NULL\\)")
+  expect_error(assert_scalar_logical_or_null(logical(0)),
+               "Expected '.+' to be a logical scalar \\(or NULL\\)")
+})
+
+
+test_that("validate inputs", {
+  expect_silent(assert_scalar_character_or_null(NULL))
+  expect_silent(assert_scalar_character_or_null("a"))
+
+  thing <- TRUE
+  expect_error(
+    assert_scalar_character_or_null(thing),
+    "Expected 'thing' to be a character scalar (or NULL)",
+    fixed = TRUE)
+  expect_error(assert_scalar_character_or_null(NA),
+               "Expected '.+' to be a character scalar \\(or NULL\\)")
+  expect_error(assert_scalar_character_or_null(character(0)),
+               "Expected '.+' to be a character scalar \\(or NULL\\)")
+})
+
+
+test_that("check names", {
+  expect_error(
+    assert_named(list()),
+    "must be named")
+  expect_error(
+    assert_named(list(1, 2)),
+    "must be named")
+  expect_silent(
+    assert_named(list(a = 1, a = 2)))
+  expect_error(
+    assert_named(list(a = 1, a = 2), TRUE),
+    "must have unique names")
+})
+
+
+test_that("Check S3 class", {
+  expect_silent(assert_is(structure(1, class = "foo"), "foo"))
+  expect_error(assert_is(structure(1, class = "bar"), "foo"),
+               "must be a foo")
+  expect_error(assert_is(1, c("foo", "bar")),
+               "must be a foo / bar")
+})

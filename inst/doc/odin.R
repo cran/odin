@@ -20,14 +20,14 @@ r_output(readLines(path_logistic))
 generator <- odin::odin(path_logistic)
 
 ## -----------------------------------------------------------------------------
-mod <- generator()
+mod <- generator$new()
 mod
 
 ## -----------------------------------------------------------------------------
 mod$init
 
 ## -----------------------------------------------------------------------------
-mod$deriv(0, mod$initial())
+mod$deriv(0, mod$initial(0))
 
 ## -----------------------------------------------------------------------------
 mod$deriv(0, 50)
@@ -56,7 +56,7 @@ generator <- odin::odin({
 })
 
 ## ----error = TRUE-------------------------------------------------------------
-generator()
+generator$new()
 
 ## -----------------------------------------------------------------------------
 mod <- generator(r = 1)
@@ -84,7 +84,7 @@ r_output(readLines(path_lorenz))
 
 ## -----------------------------------------------------------------------------
 generator <- odin::odin(path_lorenz)
-mod <- generator()
+mod <- generator$new()
 
 ## -----------------------------------------------------------------------------
 tt <- seq(0, 100, length.out = 20000)
@@ -99,7 +99,7 @@ gen <- odin::odin({
   tau <- user(10)
   output(ylag) <- ylag
 })
-dde <- gen()
+dde <- gen$new()
 
 ## -----------------------------------------------------------------------------
 t <- seq(0, 300, length.out = 301)
@@ -143,7 +143,7 @@ pars <- list(r = c(1.00, 0.72, 1.53, 1.27),
              y0 = c(0.3013, 0.4586, 0.1307, 0.3557))
 
 ## -----------------------------------------------------------------------------
-mod <- gen(user = pars)
+mod <- gen$new(user = pars)
 
 t <- seq(0, 2000, length.out = 10001)
 y <- mod$run(t)
@@ -180,7 +180,7 @@ k <- 0.01
 C0 <- mean(approx(flux_t, flux_y, xout = 1:365)$y) / k
 
 ## -----------------------------------------------------------------------------
-mod <- flux_model(kk = k, C0 = C0, flux_t = flux_t, flux_y)
+mod <- flux_model$new(kk = k, C0 = C0, flux_t = flux_t, flux_y = flux_y)
 
 ## -----------------------------------------------------------------------------
 t <- seq(1, 365)
@@ -207,7 +207,7 @@ flux_model_c <- odin::odin({
   dim(flux_y) <- user()
 })
 
-mod_c <- flux_model_c(kk = k, C0 = C0, flux_t = flux_t, flux_y)
+mod_c <- flux_model_c$new(kk = k, C0 = C0, flux_t = flux_t, flux_y = flux_y)
 y_c <- mod_c$run(t, tcrit = 365)
 
 mod_c$output_order
@@ -231,7 +231,7 @@ flux_model_s <- odin::odin({
   dim(flux_y) <- user()
 })
 
-mod_s <- flux_model_s(kk = k, C0 = C0, flux_t = flux_t, flux_y)
+mod_s <- flux_model_s$new(kk = k, C0 = C0, flux_t = flux_t, flux_y = flux_y)
 y_s <- mod_s$run(t, tcrit = 365)
 plot(t, y_s[, 3], type = "l", col = "red", ylab = "Flux & deposition")
 lines(t, y_s[, 4], col = "blue")

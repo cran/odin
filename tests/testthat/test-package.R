@@ -6,10 +6,11 @@ test_that("generate package", {
   res <- odin_create_package("example", files)
   on.exit(res$cleanup())
 
-  mod <- res$env$lorenz_odin()
+  mod <- res$env$lorenz_odin$new()
   cmp <- source1("examples/lorenz_deSolve.R")
 
-  expect_equal(dir(file.path(res$path, "src"), pattern = "\\.c$"), "odin.c")
+  expect_setequal(dir(file.path(res$path, "src"), pattern = "\\.c$"),
+                  c("odin.c", "registration.c"))
   expect_equal(dir(file.path(res$path, "R"), pattern = "\\.R$"), "odin.R")
 
   t <- seq(0, 10, length.out = 100)
@@ -42,7 +43,8 @@ test_that("interpolation", {
               0.193, 0.286, 0.599, 1.889, 0.996, 0.681, 1.135)
   k <- 0.01
   C0 <- mean(approx(flux_t, flux_y, xout = 1:365)$y) / k
-  mod <- res$env$interpolate_odin(kk = k, C0 = C0, flux_t = flux_t, flux_y)
+  mod <- res$env$interpolate_odin$new(kk = k, C0 = C0, flux_t = flux_t,
+                                      flux_y = flux_y)
 
   t <- seq(1, 365)
 
@@ -66,7 +68,7 @@ test_that("ring", {
   res <- odin_create_package("discretedelay", path)
   on.exit(res$cleanup())
 
-  mod <- res$env$discretedelay()
+  mod <- res$env$discretedelay$new()
   tt <- seq(0:10)
   yy <- mod$run(tt)
   expect_equal(yy[, "y"], c(1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144))
@@ -79,7 +81,7 @@ test_that("user_c", {
   res <- odin_create_package("pulse", path)
   on.exit(res$cleanup())
 
-  mod <- res$env$pulse()
+  mod <- res$env$pulse$new()
   t <- seq(0, 3, length.out = 301)
   y <- mod$run(t)
 
@@ -102,6 +104,19 @@ test_that("pathalogical user c", {
     "Duplicated entries in included C support not allowed")
 })
 
+
+test_that("allow reuse of user eqs", {
+  skip_on_windows_gha()
+  tmp <- file.path(tempdir(), "pulse2.R")
+  txt <- file.copy("pkg/inst/odin/pulse.R", tmp, overwrite = TRUE)
+  path <- c("pkg/inst/odin/pulse.R", tmp, "user_fns.c")
+  res <- odin_create_package("pulse", path)
+
+  t <- seq(0, 3, length.out = 301)
+  expect_equal(
+    res$env$pulse$new()$run(t),
+    res$env$pulse2$new()$run(t))
+})
 
 test_that("error cases", {
   name <- "example"
@@ -137,11 +152,11 @@ test_that("example package", {
   pkg <- file.path(path, "package")
 
   odin_package(pkg)
-  res <- build_package(pkg)
+  res <- build_package(pkg, FALSE)
   on.exit(res$cleanup())
 
   expect_is(res$env$lorenz, "odin_generator")
-  mod <- res$env$lorenz()
+  mod <- res$env$lorenz$new()
   expect_equal(mod$initial(0), c(10, 1, 1))
   expect_equal(mod$deriv(0, c(10, 1, 1)),
                c(-90, 269, 22 / 3))
@@ -166,11 +181,11 @@ test_that("two sums example", {
   writeLines(code, file.path(pkg, "inst/odin/z.R"))
 
   odin_package(pkg)
-  res <- build_package(pkg)
+  res <- build_package(pkg, FALSE)
   on.exit(res$cleanup())
 
   expect_is(res$env$z, "odin_generator")
-  mod <- res$env$z()
+  mod <- res$env$z$new()
   expect_equal(mod$initial(0), 0)
   expect_equal(mod$deriv(0, 0), 12)
 })

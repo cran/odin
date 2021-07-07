@@ -228,47 +228,65 @@ test_that("RHS array checking", {
   ##
   ## TODO: I would prefer this to go all the way from odin_parse
   expect_null(ir_parse_arrays_check_rhs(quote(a + b[1]), c(b = 1), ia,
-                                        eq, source))
+                                        NULL, eq, source))
   expect_error(ir_parse_arrays_check_rhs(quote(a + b[1]), c(b = 2), ia,
-                                         eq, source),
+                                         NULL, eq, source),
                "Incorrect dimensionality for 'b'", class = "odin_error")
   expect_error(ir_parse_arrays_check_rhs(quote(a + b[1, 2, 3]), c(b = 2), ia,
-                                         eq, source),
+                                         NULL, eq, source),
                "Incorrect dimensionality for 'b'", class = "odin_error")
   expect_null(ir_parse_arrays_check_rhs(quote(a + b[1, 2, 3]), c(b = 3), ia,
-                                        eq, source))
+                                        NULL, eq, source))
   expect_error(ir_parse_arrays_check_rhs(quote(a + b[f(1)]), c(b = 1), ia,
-                                         eq, source),
+                                         NULL, eq, source),
                "Disallowed functions used for b", class = "odin_error")
   expect_error(ir_parse_arrays_check_rhs(quote(b), c(b = 1), ia,
-                                         eq, source),
+                                         NULL, eq, source),
                "Array 'b' used without array index", class = "odin_error")
   expect_null(ir_parse_arrays_check_rhs(quote(a), c(b = 1), ia,
-                                        eq, source))
+                                        NULL, eq, source))
   expect_error(ir_parse_arrays_check_rhs(quote(a[]), c(a = 1), ia,
-                                         eq, source),
+                                         NULL, eq, source),
                "Empty array index not allowed on rhs", class = "odin_error")
 
   rhs <- ir_parse_expr_rhs_expression_sum(quote(sum(a)))
-  expect_null(ir_parse_arrays_check_rhs(rhs, c(a = 1), ia, eq, source))
-  expect_error(ir_parse_arrays_check_rhs(rhs, c(b = 1), ia, eq, source),
+  expect_null(ir_parse_arrays_check_rhs(rhs, c(a = 1), ia, NULL, eq, source))
+  expect_error(ir_parse_arrays_check_rhs(rhs, c(b = 1), ia, NULL, eq, source),
                "Function 'sum' requires array as argument 1",
                class = "odin_error")
 
   rhs <- ir_parse_expr_rhs_expression_sum(quote(sum(a[])))
-  expect_error(ir_parse_arrays_check_rhs(rhs, c(b = 1), ia, eq, source),
+  expect_error(ir_parse_arrays_check_rhs(rhs, c(b = 1), ia, NULL, eq, source),
                "Function 'sum' requires array as argument 1",
                class = "odin_error")
 
   expr <- quote(sum(a[, ]))
   rhs <- ir_parse_expr_rhs_expression_sum(expr)
-  expect_error(ir_parse_arrays_check_rhs(rhs, c(a = 1), ia, eq, source),
+  expect_error(ir_parse_arrays_check_rhs(rhs, c(a = 1), ia, NULL, eq, source),
                "Incorrect dimensionality for 'a' in 'sum' (expected 1)",
                fixed = TRUE, class = "odin_error")
-  expect_silent(ir_parse_arrays_check_rhs(rhs, c(a = 2), ia, eq, source))
-  expect_error(ir_parse_arrays_check_rhs(rhs, c(a = 3), ia, eq, source),
+  expect_silent(ir_parse_arrays_check_rhs(rhs, c(a = 2), ia, NULL, eq, source))
+  expect_error(ir_parse_arrays_check_rhs(rhs, c(a = 3), ia, NULL, eq, source),
                "Incorrect dimensionality for 'a' in 'sum' (expected 3)",
                fixed = TRUE, class = "odin_error")
+})
+
+test_that("custom functions ignore arrays", {
+  eq <- list(source = 1)
+  expr <- quote(x)
+  ia <- character(0)
+  source <- "x"
+  include <- "f"
+
+  expect_null(ir_parse_arrays_check_rhs(quote(a + b[1]), c(b = 1), ia,
+                                        include, eq, source))
+  expect_null(ir_parse_arrays_check_rhs(quote(f(a, b[1])), c(b = 1), ia,
+                                        include, eq, source))
+  expect_null(ir_parse_arrays_check_rhs(quote(f(a, b)), c(b = 1), ia,
+                                        include, eq, source))
+  expect_error(ir_parse_arrays_check_rhs(quote(g(a, b)), c(b = 1), ia,
+                                         include, eq, source),
+               "Array 'b' used without array index")
 })
 
 test_that("lhs array checking", {
@@ -352,26 +370,39 @@ test_that("recursive variables", {
 })
 
 test_that("array extent and time", {
-  expect_error(odin_parse_(quote({
-    deriv(y[]) <- 1
-    initial(y[]) <- 0
-    dim(y) <- t
-  })), "Array extent is determined by time", class = "odin_error")
+  opts <- list(
+    odin_options(rewrite_dims = FALSE, rewrite_constants = FALSE),
+    odin_options(rewrite_dims = TRUE, rewrite_constants = FALSE),
+    odin_options(rewrite_dims = FALSE, rewrite_constants = TRUE))
 
-  expect_error(odin_parse_(quote({
-    deriv(y[]) <- 1
-    initial(y[]) <- 0
-    a <- t
-    dim(y) <- a
-  })), "Array extent is determined by time", class = "odin_error")
+  for (o in opts) {
+    expect_error(
+      odin_parse_(quote({
+        deriv(y[]) <- 1
+        initial(y[]) <- 0
+        dim(y) <- t
+      }), options = o),
+      "Array extent is determined by time", class = "odin_error")
 
-  expect_error(odin_parse_(quote({
-    deriv(y[]) <- 1
-    initial(y[]) <- 0
-    deriv(z) <- 1
-    initial(z) <- 0
-    dim(y) <- z
-  })), "Array extent is determined by time", class = "odin_error")
+    expect_error(
+      odin_parse_(quote({
+        deriv(y[]) <- 1
+        initial(y[]) <- 0
+        a <- t
+        dim(y) <- a
+      }), options = o),
+      "Array extent is determined by time", class = "odin_error")
+
+    expect_error(
+      odin_parse_(quote({
+        deriv(y[]) <- 1
+        initial(y[]) <- 0
+        deriv(z) <- 1
+        initial(z) <- 0
+        dim(y) <- z
+      }), options = o),
+      "Array extent is determined by time", class = "odin_error")
+  }
 })
 
 test_that("lhs checking", {
@@ -590,12 +621,17 @@ test_that("check array rhs", {
 
 ## Probably more needed here as there are some special cases...
 test_that("cyclic dependency", {
-  expect_error(
-    odin_parse_(ex("x <- y; y <- x")),
-    "A cyclic dependency detected")
-  expect_error(
-    odin_parse_(ex("x <- y; y <- z; z <- x")),
-    "A cyclic dependency detected")
+  opts <- list(
+    odin_options(rewrite_constants = FALSE),
+    odin_options(rewrite_constants = TRUE))
+  for (o in opts) {
+    expect_error(
+      odin_parse_(ex("x <- y; y <- x"), options = o),
+      "A cyclic dependency detected")
+    expect_error(
+      odin_parse_(ex("x <- y; y <- z; z <- x"), options = o),
+      "A cyclic dependency detected")
+  }
 })
 
 test_that("range operator on RHS", {
@@ -721,26 +757,12 @@ test_that("detect integers", {
     initial(I) <- 0
     S0[, ] <- user()
     dim(S0) <- c(n, m)
-  })
+  }, options = odin_options(rewrite_constants = FALSE))
   dat <- ir_deserialise(ir)
   type <- vcapply(dat$data$elements, "[[", "storage_type")
   int <- names_if(type == "int")
   expect_true("n" %in% int)
   expect_true("m" %in% int)
-})
-
-
-test_that("notify on naked index", {
-  code <- c(
-    "deriv(x[]) <- i",
-    "initial(x[]) <- 1",
-    "dim(x) <- 5")
-  expect_message(
-    odin_parse(code),
-    "Equations use index variables i on the rhs outside of an index.")
-  expect_message(
-    odin_parse(code, options = odin_options(no_check_naked_index = TRUE)),
-    NA)
 })
 
 
@@ -763,50 +785,6 @@ test_that("dim on rhs", {
       dim(r) <- dim(y, n)
   }),
   "Invalid dim call; expected integer second argument", class = "odin_error")
-})
-
-
-test_that("skip sum in naked index check", {
-  ## In the first version of the naked index check, this produced a
-  ## note because the sum expression expands out to
-  ##
-  ## >  odin_sum(m, i, i, 1, dim(m, 2))
-  ##
-  ## which looks like a naked index.
-  expect_silent(
-    odin_parse({
-      deriv(y) <- sum(v)
-      initial(y) <- 1
-      m[, ] <- user()
-      v[] <- sum(m[i, ])
-      dim(m) <- c(4, 4)
-      dim(v) <- 4
-    }))
-})
-
-
-test_that("skip some equality operations in naked index check", {
-  ## This turns up in lily's model
-  expect_silent(odin_parse({
-    deriv(y) <- 1
-    initial(y) <- sum(m)
-    m[, ] <- if (i == j) 1 else 0
-    dim(m) <- c(4, 4)
-  }))
-
-  expect_message(odin_parse({
-    deriv(y) <- 1
-    initial(y) <- sum(m)
-    m[, ] <- if (i == 1) 1 else 0
-    dim(m) <- c(4, 4)
-  }), "Equations use index variables i on the rhs outside of an index")
-
-  expect_message(odin_parse({
-    deriv(y) <- 1
-    initial(y) <- sum(m)
-    m[, ] <- if (i == j + 0) 1 else 0
-    dim(m) <- c(4, 4)
-  }), "Equations use index variables i, j on the rhs outside of an index")
 })
 
 
@@ -850,4 +828,15 @@ test_that("can't use array indices that exceed the rank of the lhs", {
     }),
     "Index variable 'j', 'k' not possible for array of rank 1",
     fixed = TRUE, class = "odin_error")
+})
+
+
+## Reported by Charlie
+test_that("can't use C identifier", {
+  expect_error(
+    odin_parse({
+      initial(int) <- 1
+      deriv(int) <- 0
+    }),
+    "Reserved name 'int' for lhs")
 })

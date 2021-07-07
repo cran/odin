@@ -1,3 +1,43 @@
+# odin 1.1.13
+
+* Allow spaces in filenames passed to `odin::odin()` (#225)
+
+# odin 1.1.12
+
+* New option `rewrite_constants` (via `odin::odin_options`) which attempts to rewrite all constants in the model code before generation. This can considerably reduce the number of variable lookups (mrc-2252)
+
+# odin 1.1.11
+
+* New option `substitutions` (via `odin::odin_options`) which can substitute in scalar `user` values at compile time (#220)
+
+# odin 1.1.9
+
+* New option `rewrite_dims` (via `odin::odin_options`) which will attempt to simplify common dimensions. This can reduce the number of variables carried around in the model as these are typically very redundant and also known at compile time (mrc-2093)
+
+# odin 1.1.8
+
+* Annotate equations with `# ignore.unused` to locally suppress messages about unused variables (mrc-2122)
+
+# odin 1.1.6
+
+* odin no longer warns about use of index variables on rhs as new behaviour has been established for a while (#136)
+
+# odin 1.1.4
+
+* Better error messages when C identifiers (e.g., `int`) are used in equations (reported by @rhysinward, @katietiley and @cwhittaker1000)
+
+# odin 1.1.2
+
+* Support for `config(include)` has been expanded, working for R models and designed to be extensible for other targets (mrc-2016)
+
+# odin 1.1.0
+
+* The basic infrastructure has been overhauled, which will make some alternative compilation targets easier to support. We now use `pkgbuild` for the compilation which should ease debugging, and odin code compiled into packages will no longer issue a slew of warnings (and cooperate with automatic routine registration). This refactor has caused a few minor breaking changes:
+  - `$initial()` always requires time, even if it is ignored
+  - `$set_user()` and construction no longer work with positional argument matching - all arguments must be named
+  - The `$ir` field has become a method; add parentheses after it
+  - The `compiler_warnings` option has been removed
+
 # odin 1.0.7
 
 * Support for `as.integer()` to cast to integer for use within array expressions (#200)

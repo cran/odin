@@ -1,14 +1,14 @@
-context("run: %TARGET%: discrete")
+context("run: discrete")
 
-test_that("basic", {
+test_that_odin("basic", {
   gen <- odin({
     initial(x) <- 1
     update(x) <- x + 1
   })
 
-  mod <- gen()
+  mod <- gen$new()
   expect_equal(mod$contents(), list(initial_x = 1))
-  y0 <- mod$initial()
+  y0 <- mod$initial(0)
   expect_equal(y0, 1.0)
   expect_equal(mod$update(0L, y0), 2.0)
 
@@ -18,7 +18,7 @@ test_that("basic", {
   expect_equal(res, cbind(step = tt, x = 1:11))
 })
 
-test_that("output", {
+test_that_odin("output", {
   gen <- odin({
     initial(x[]) <- x0[i]
     update(x[]) <- x[i] + r[i]
@@ -33,7 +33,7 @@ test_that("output", {
   x0 <- runif(10)
   r <- runif(length(x0))
 
-  mod <- gen(x0 = x0, r = r)
+  mod <- gen$new(x0 = x0, r = r)
 
   tt <- 0:10
   yy <- mod$run(tt)
@@ -43,7 +43,7 @@ test_that("output", {
   expect_equal(zz$total, rowSums(zz$x))
 })
 
-test_that("interpolate", {
+test_that_odin("interpolate", {
   gen <- odin({
     initial(x) <- 0
     update(x) <- x + pulse
@@ -56,10 +56,12 @@ test_that("interpolate", {
 
   sp <- c(0, 10, 20)
   zp <- c(0, 1, 0)
-  expect_error(gen(sp = sp, zp = zp[1:2]), "Expected length 3 value for zp")
-  expect_error(gen(sp = sp, zp = rep(zp, 2)), "Expected length 3 value for zp")
+  expect_error(gen$new(sp = sp, zp = zp[1:2]),
+               "Expected length 3 value for zp")
+  expect_error(gen$new(sp = sp, zp = rep(zp, 2)),
+               "Expected length 3 value for zp")
 
-  mod <- gen(sp = sp, zp = zp)
+  mod <- gen$new(sp = sp, zp = zp)
 
   tt <- 0:30
   expect_error(mod$run(tt - 1L),
@@ -70,19 +72,19 @@ test_that("interpolate", {
   expect_equal(yy[, 2], zz)
 })
 
-test_that("use step in model", {
+test_that_odin("use step in model", {
   gen <- odin({
     initial(x) <- step
     update(x) <- step + 1
   })
 
-  mod <- gen()
+  mod <- gen$new()
   res <- mod$run(5:10)
   expect_equal(res[, "x"], res[, "step"])
 })
 
 ## This is to avoid a regression with array_dim_name
-test_that("2d array equations", {
+test_that_odin("2d array equations", {
   gen <- odin({
     initial(x[, ]) <- x0[i, j]
     update(x[, ]) <- x[i, j] + r[i, j]
@@ -96,7 +98,7 @@ test_that("2d array equations", {
   r <- matrix(runif(10), 2, 5)
   x0 <- matrix(runif(10), 2, 5)
 
-  mod <- gen(x0 = x0, r = r)
+  mod <- gen$new(x0 = x0, r = r)
   yy <- mod$run(0:10)
 
   expect_equal(mod$contents()$x0, x0)
@@ -107,7 +109,7 @@ test_that("2d array equations", {
 })
 
 ## This turns up in one of Neil's cases:
-test_that("complex initialisation: scalar", {
+test_that_odin("complex initialisation: scalar", {
   gen <- odin({
     initial(x1) <- norm_rand()
     r <- x1 * 2
@@ -126,7 +128,7 @@ test_that("complex initialisation: scalar", {
   })
 
   set.seed(1)
-  mod <- gen()
+  mod <- gen$new()
 
   v <- mod$initial(0)
   vv <- mod$transform_variables(v)
@@ -136,7 +138,7 @@ test_that("complex initialisation: scalar", {
   expect_equal(vv$x1, x1)
   expect_equal(vv$x2, x1 * 2 + 1)
 
-  mod2 <- gen2(x1)
+  mod2 <- gen2$new(x1_0 = x1)
   v2 <- mod2$initial(0)
   expect_equal(v2, v)
 
@@ -149,7 +151,7 @@ test_that("complex initialisation: scalar", {
   ## It's a bit of an odd model because r grows with x1
 })
 
-test_that("complex initialisation: vector", {
+test_that_odin("complex initialisation: vector", {
   gen <- odin({
     initial(x1[]) <- norm_rand()
     r[] <- x1[i] * 2
@@ -164,7 +166,7 @@ test_that("complex initialisation: vector", {
   })
 
   set.seed(1)
-  mod <- gen()
+  mod <- gen$new()
 
   v <- mod$initial(0)
   vv <- mod$transform_variables(v)
@@ -174,4 +176,28 @@ test_that("complex initialisation: vector", {
   expect_equal(vv$x1, cmp)
   expect_equal(vv$x2, cmp * 2 + 1)
   expect_equal(mod$contents()$r, cmp * 2)
+})
+
+
+test_that_odin("can set initial conditions", {
+  gen <- odin({
+    initial(x) <- 1
+    update(x) <- x + 1
+  })
+
+  mod <- gen$new()
+  y <- mod$run(0:10, 2)
+  expect_equal(y[, "x"], 2:12)
+})
+
+
+test_that_odin("can set/omit ynames", {
+  gen <- odin({
+    initial(x) <- 1
+    update(x) <- x + 1
+  })
+
+  mod <- gen$new()
+  expect_equal(colnames(mod$run(0:10)), c("step", "x"))
+  expect_null(colnames(mod$run(0:10, use_names = FALSE)))
 })

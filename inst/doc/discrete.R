@@ -21,7 +21,7 @@ sir_generator <- odin::odin(path_sir_model)
 sir_generator
 
 ## -----------------------------------------------------------------------------
-x <- sir_generator()
+x <- sir_generator$new()
 x
 
 ## ----sir-deterministic, fig.cap = "<i>An example of deterministic, discrete-time SIR model</i><br>"----
@@ -42,7 +42,7 @@ r_output(readLines(path_sir_model_s))
 ## -----------------------------------------------------------------------------
 sir_s_generator <- odin::odin(path_sir_model_s)
 sir_s_generator
-x <- sir_s_generator(I_ini = 10)
+x <- sir_s_generator$new(I_ini = 10)
 
 ## ----sir-stochastic_1, fig.cap = "<i>An example of stochastic, discrete-time SIR model</i><br>"----
 set.seed(1)
@@ -61,7 +61,7 @@ r_output(readLines(path_sir_model_s_a))
 ## ----echo = TRUE--------------------------------------------------------------
 sir_s_a_generator <- odin::odin(path_sir_model_s_a)
 sir_s_a_generator
-x <- sir_s_a_generator()
+x <- sir_s_a_generator$new()
 
 ## ----sir-stochastic_100, fig.cap = "<i>100 replicates of a stochastic, discrete-time SIR model</i><br>"----
 set.seed(1)
@@ -81,7 +81,7 @@ r_output(readLines(path_seirds_model))
 ## ----seirds-------------------------------------------------------------------
 seirds_generator <- odin::odin(path_seirds_model)
 seirds_generator
-x <- seirds_generator()
+x <- seirds_generator$new()
 
 
 seirds_col <- c("#8c8cd9", "#e67300", "#d279a6", "#ff4d4d", "#999966", "#660000")

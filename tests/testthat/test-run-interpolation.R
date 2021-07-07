@@ -1,6 +1,6 @@
-context("run: %TARGET%: interpolation")
+context("run: interpolation")
 
-test_that("constant", {
+test_that_odin("constant", {
   gen <- odin({
     deriv(y) <- pulse
     initial(y) <- 0
@@ -29,10 +29,12 @@ test_that("constant", {
   ## already some checking there.
   tp <- c(0, 1, 2)
   zp <- c(0, 1, 0)
-  expect_error(gen(tp = tp, zp = zp[1:2]), "Expected zp to have length 3")
-  expect_error(gen(tp = tp, zp = rep(zp, 2)), "Expected zp to have length 3")
+  expect_error(gen$new(tp = tp, zp = zp[1:2]),
+               "Expected zp to have length 3")
+  expect_error(gen$new(tp = tp, zp = rep(zp, 2)),
+               "Expected zp to have length 3")
 
-  mod <- gen(tp = tp, zp = zp)
+  mod <- gen$new(tp = tp, zp = zp)
 
   tt <- seq(0, 3, length.out = 301)
   expect_error(mod$run(tt - 0.1),
@@ -44,7 +46,7 @@ test_that("constant", {
 })
 
 
-test_that("constant array", {
+test_that_odin("constant array", {
   gen <- odin({
     deriv(y[]) <- pulse[i]
     initial(y[]) <- 0
@@ -63,12 +65,16 @@ test_that("constant array", {
   zp <- cbind(c(0, 1, 0),
               c(0, 2, 0))
   ## Two dimensions to check here:
-  expect_error(gen(tp = tp, zp = zp[1:2, ]), "zp to have size 3")
-  expect_error(gen(tp = tp, zp = zp[c(1:3, 1:3), ]), "zp to have size 3")
-  expect_error(gen(tp = tp, zp = zp[, 1, drop = FALSE]), "zp to have size 2")
-  expect_error(gen(tp = tp, zp = zp[, c(1:2, 1)]), "zp to have size 2")
+  expect_error(gen$new(tp = tp, zp = zp[1:2, ]),
+               "zp to have size 3")
+  expect_error(gen$new(tp = tp, zp = zp[c(1:3, 1:3), ]),
+               "zp to have size 3")
+  expect_error(gen$new(tp = tp, zp = zp[, 1, drop = FALSE]),
+               "zp to have size 2")
+  expect_error(gen$new(tp = tp, zp = zp[, c(1:2, 1)]),
+               "zp to have size 2")
 
-  mod <- gen(tp = tp, zp = zp)
+  mod <- gen$new(tp = tp, zp = zp)
 
   tt <- seq(0, 3, length.out = 301)
   expect_error(mod$run(tt - 0.1),
@@ -82,7 +88,7 @@ test_that("constant array", {
 })
 
 
-test_that("constant 3d array", {
+test_that_odin("constant 3d array", {
   gen <- odin({
     deriv(y[, ]) <- pulse[i, j]
     initial(y[, ]) <- 0
@@ -111,14 +117,20 @@ test_that("constant 3d array", {
   stopifnot(isTRUE(all.equal(zp[3, , ], matrix(0, 2, 2))))
 
   ## Three dimensions to check here:
-  expect_error(gen(tp = tp, zp = zp[1:2, , ]), "zp to have size 3")
-  expect_error(gen(tp = tp, zp = zp[c(1:3, 1:3), , ]), "zp to have size 3")
-  expect_error(gen(tp = tp, zp = zp[, 1, , drop = FALSE]), "zp to have size 2")
-  expect_error(gen(tp = tp, zp = zp[, c(1:2, 1), ]), "zp to have size 2")
-  expect_error(gen(tp = tp, zp = zp[, , 1, drop = FALSE]), "zp to have size 2")
-  expect_error(gen(tp = tp, zp = zp[, , c(1:2, 1)]), "zp to have size 2")
+  expect_error(gen$new(tp = tp, zp = zp[1:2, , ]),
+               "zp to have size 3")
+  expect_error(gen$new(tp = tp, zp = zp[c(1:3, 1:3), , ]),
+               "zp to have size 3")
+  expect_error(gen$new(tp = tp, zp = zp[, 1, , drop = FALSE]),
+               "zp to have size 2")
+  expect_error(gen$new(tp = tp, zp = zp[, c(1:2, 1), ]),
+               "zp to have size 2")
+  expect_error(gen$new(tp = tp, zp = zp[, , 1, drop = FALSE]),
+               "zp to have size 2")
+  expect_error(gen$new(tp = tp, zp = zp[, , c(1:2, 1)]),
+               "zp to have size 2")
 
-  mod <- gen(tp = tp, zp = zp)
+  mod <- gen$new(tp = tp, zp = zp)
 
   tt <- seq(0, 3, length.out = 301)
   expect_error(mod$run(tt - 0.1),
@@ -131,7 +143,7 @@ test_that("constant 3d array", {
 })
 
 
-test_that("linear", {
+test_that_odin("linear", {
   gen <- odin({
     deriv(y) <- pulse
     initial(y) <- 0
@@ -146,14 +158,14 @@ test_that("linear", {
 
   tp <- c(0, 1, 2)
   zp <- c(0, 1, 0)
-  mod <- gen(tp = tp, zp = zp)
+  mod <- gen$new(tp = tp, zp = zp)
 
   tt <- seq(0, 2, length.out = 101)
   yy <- mod$run(tt)
 
   f <- approxfun(tp, zp, "linear")
   target <- function(t, x, .) list(f(t))
-  cmp <- deSolve::lsoda(mod$initial(), tt, target, tcrit = 2)
+  cmp <- deSolve::lsoda(mod$initial(0), tt, target, tcrit = 2)
   expect_equal(yy[, 2], cmp[, 2])
 
   expect_error(mod$run(c(tt, max(tp) + 1)),
@@ -164,7 +176,7 @@ test_that("linear", {
 })
 
 
-test_that("spline", {
+test_that_odin("spline", {
   gen <- odin({
     deriv(y) <- pulse
     initial(y) <- 0
@@ -179,19 +191,19 @@ test_that("spline", {
 
   tp <- seq(0, pi, length.out = 31)
   zp <- sin(tp)
-  mod <- gen(tp = tp, zp = zp)
+  mod <- gen$new(tp = tp, zp = zp)
 
   tt <- seq(0, pi, length.out = 101)
   yy <- mod$run(tt, tcrit = tt[length(tt)])
 
   f <- splinefun(tp, zp, "natural")
   target <- function(t, x, .) list(f(t))
-  cmp <- deSolve::lsoda(mod$initial(), tt, target, tcrit = tt[length(tt)])
+  cmp <- deSolve::lsoda(mod$initial(0), tt, target, tcrit = tt[length(tt)])
   expect_equal(yy[, 2], cmp[, 2])
 })
 
 
-test_that("interpolation with two variables", {
+test_that_odin("interpolation with two variables", {
   for (type in INTERPOLATION_TYPES) {
     gen <- odin_(
       bquote({
@@ -215,7 +227,7 @@ test_that("interpolation with two variables", {
     zp1 <- c(0, 1)
     tp2 <- c(0, 1, 2)
     zp2 <- c(0, 1, 0)
-    mod <- gen(tp1 = tp1, zp1 = zp1, tp2 = tp2, zp2 = zp2)
+    mod <- gen$new(tp1 = tp1, zp1 = zp1, tp2 = tp2, zp2 = zp2)
 
     t1 <- if (type == "constant") max(tp1) else max(tp2)
     expect_equal(r6_private(mod)$interpolate_t$min, 0)
@@ -247,7 +259,7 @@ test_that("interpolation with two variables", {
 })
 
 
-test_that("interpolation in a delay", {
+test_that_odin("interpolation in a delay", {
   gen <- odin({
     deriv(y) <- ud
     initial(y) <- 0
@@ -268,7 +280,7 @@ test_that("interpolation in a delay", {
 
   tt <- seq(0, 10, length.out = 11)
   u <- seq(-10, 20, length.out = 301)
-  mod <- gen(ut = u, uy = u)
+  mod <- gen$new(ut = u, uy = u)
   yy <- mod$run(tt)
 
   expect_equal(yy[, "ud"], seq(-2, 8))
@@ -276,7 +288,7 @@ test_that("interpolation in a delay", {
 })
 
 
-test_that("interpolation in a delay, with default", {
+test_that_odin("interpolation in a delay, with default", {
   gen <- odin({
     deriv(y) <- ud
     initial(y) <- 0
@@ -297,7 +309,7 @@ test_that("interpolation in a delay, with default", {
 
   tt <- seq(0, 10, length.out = 11)
   u <- seq(-10, 20, length.out = 301)
-  mod <- gen(ut = u, uy = u)
+  mod <- gen$new(ut = u, uy = u)
   yy <- mod$run(tt)
 
   expect_equal(yy[, "ud"], c(3, 3, 3, seq(1, 8)))
@@ -305,7 +317,7 @@ test_that("interpolation in a delay, with default", {
 })
 
 
-test_that("critical times", {
+test_that_odin("critical times", {
   ## this is only done for the R generation so far:
   skip_for_target("c")
   gen <- odin({
@@ -329,13 +341,13 @@ test_that("critical times", {
   zp1 <- c(0, 1)
   tp2 <- c(-1, 1, 2)
   zp2 <- c(0, 1, 0)
-  mod <- gen(tp1 = tp1, zp1 = zp1, tp2 = tp2, zp2 = zp2)
+  mod <- gen$new(tp1 = tp1, zp1 = zp1, tp2 = tp2, zp2 = zp2)
 
   expect_equal(r6_private(mod)$interpolate_t$critical, c(-1, 1, 2, 3))
 })
 
 
-test_that("user sized interpolation, 1d", {
+test_that_odin("user sized interpolation, 1d", {
   gen <- odin({
     deriv(y[]) <- pulse[i]
     initial(y[]) <- 0
@@ -356,7 +368,7 @@ test_that("user sized interpolation, 1d", {
   tp <- c(0, 1, 2)
   zp <- cbind(c(0, 1, 0),
               c(0, 2, 0))
-  mod <- gen(tp = tp, zp = zp)
+  mod <- gen$new(tp = tp, zp = zp)
 
   tt <- seq(0, 3, length.out = 301)
   yy <- mod$run(tt)
@@ -367,7 +379,7 @@ test_that("user sized interpolation, 1d", {
 })
 
 
-test_that("user sized interpolation, 2d", {
+test_that_odin("user sized interpolation, 2d", {
   gen <- odin({
     deriv(y[, ]) <- pulse[i, j]
     initial(y[, ]) <- 0
@@ -387,7 +399,7 @@ test_that("user sized interpolation, 2d", {
                 c(0, 2, 0),
                 c(0, 3, 0),
                 c(0, 4, 0)), c(length(tp), 2, 2))
-  mod <- gen(tp = tp, zp = zp)
+  mod <- gen$new(tp = tp, zp = zp)
   dat <- mod$contents()
 
   tt <- seq(0, 3, length.out = 301)
@@ -398,7 +410,7 @@ test_that("user sized interpolation, 2d", {
 })
 
 
-test_that("double delayed interpolation function", {
+test_that_odin("double delayed interpolation function", {
   gen <- odin({
     deriv(y) <- ud
     initial(y) <- 0
@@ -425,14 +437,14 @@ test_that("double delayed interpolation function", {
   ut <- c(-20, 2)
   uy <- c(0, 1)
 
-  mod <- gen(ut = ut, uy = uy)
+  mod <- gen$new(ut = ut, uy = uy)
   yy <- mod$run(tt)
 
   expect_equal(yy[, "udd"], ifelse(tt < 5, 0, 0.5))
 
-  expect_error(gen(ut = c(0, 2), uy = uy)$run(tt),
+  expect_error(gen$new(ut = c(0, 2), uy = uy)$run(tt),
                "Interpolation failed as -2.* is out of range")
-  expect_error(gen(ut = c(-2, 2), uy = uy)$run(tt),
+  expect_error(gen$new(ut = c(-2, 2), uy = uy)$run(tt),
                "Interpolation failed as -3.* is out of range")
-  expect_equal(gen(ut = c(-3, 2), uy = uy)$run(tt), yy)
+  expect_equal(gen$new(ut = c(-3, 2), uy = uy)$run(tt), yy)
 })
