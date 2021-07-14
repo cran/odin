@@ -1,6 +1,6 @@
 Package: odin
 Title: ODE Generation and Integration
-Version: 1.2.0
+Version: 1.2.1
 Authors@R: c(person("Rich", "FitzJohn", role = c("aut", "cre"),
                     email = "rich.fitzjohn@gmail.com"),
              person("Thibaut", "Jombart", role = "ctb"),
@@ -35,10 +35,10 @@ RoxygenNote: 7.1.1
 Encoding: UTF-8
 Language: en-GB
 NeedsCompilation: no
-Packaged: 2021-07-07 07:24:32 UTC; rfitzjoh
+Packaged: 2021-07-14 07:48:40 UTC; rfitzjoh
 Author: Rich FitzJohn [aut, cre],
   Thibaut Jombart [ctb],
   Imperial College of Science, Technology and Medicine [cph]
 Maintainer: Rich FitzJohn <rich.fitzjohn@gmail.com>
 Repository: CRAN
-Date/Publication: 2021-07-07 09:20:02 UTC
+Date/Publication: 2021-07-14 12:30:09 UTC
