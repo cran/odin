@@ -12,7 +12,7 @@
 
 <meta name="author" content="Thibaut Jombart, Rich FitzJohn" />
 
-<meta name="date" content="2022-04-28" />
+<meta name="date" content="2023-10-02" />
 
 <title>odin discrete models</title>
 
@@ -25,6 +25,7 @@
   div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
   ul.task-list{list-style: none;}
     </style>
+
 
 
 <style type="text/css">
@@ -106,13 +107,20 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
   for (var i = 0; i < sheets.length; i++) {
     if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
     try { var rules = sheets[i].cssRules; } catch (e) { continue; }
-    for (var j = 0; j < rules.length; j++) {
+    var j = 0;
+    while (j < rules.length) {
       var rule = rules[j];
       // check if there is a div.sourceCode rule
-      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") continue;
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
       var style = rule.style.cssText;
       // check if color or background-color is set
-      if (rule.style.color === '' && rule.style.backgroundColor === '') continue;
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
       // replace div.sourceCode by a pre.sourceCode rule
       sheets[i].deleteRule(j);
       sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
@@ -318,7 +326,7 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 <h1 class="title toc-ignore">odin discrete models</h1>
 <h4 class="author">Thibaut Jombart, Rich FitzJohn</h4>
-<h4 class="date">2022-04-28</h4>
+<h4 class="date">2023-10-02</h4>
 
 
 <div id="TOC">
@@ -454,12 +462,12 @@ I_{t+1} = I_t + \beta \frac{S_t I_t}{N_t} + \epsilon - \gamma I_t
 ##     ynames: NULL
 ##     interpolate_t: NULL
 ##     cfuns: list
-##     dll: discrete.deterministic.sircf0164b4
+##     dll: discrete.deterministic.sirc5c4eca0
 ##     user: I_ini S_ini beta gamma
 ##     registration: function () 
 ##     set_initial: function (step, y, use_dde) 
 ##     update_metadata: function () 
-##   Parent env: &lt;environment: namespace:discrete.deterministic.sircf0164b4&gt;
+##   Parent env: &lt;environment: namespace:discrete.deterministic.sirc5c4eca0&gt;
 ##   Locked objects: TRUE
 ##   Locked class: FALSE
 ##   Portable: TRUE</code></pre>
@@ -480,7 +488,7 @@ I_{t+1} = I_t + \beta \frac{S_t I_t}{N_t} + \epsilon - \gamma I_t
 ##     update: function (step, y) 
 ##   Private:
 ##     cfuns: list
-##     dll: discrete.deterministic.sircf0164b4
+##     dll: discrete.deterministic.sirc5c4eca0
 ##     interpolate_t: NULL
 ##     n_out: 0
 ##     odin: environment
@@ -573,12 +581,12 @@ I_{t+1} = I_t + \beta \frac{S_t I_t}{N_t} + \epsilon - \gamma I_t
 ##     ynames: NULL
 ##     interpolate_t: NULL
 ##     cfuns: list
-##     dll: discrete.stochastic.sirae6a1613
+##     dll: discrete.stochastic.sir1ae7b862
 ##     user: I_ini S_ini beta gamma
 ##     registration: function () 
 ##     set_initial: function (step, y, use_dde) 
 ##     update_metadata: function () 
-##   Parent env: &lt;environment: namespace:discrete.stochastic.sirae6a1613&gt;
+##   Parent env: &lt;environment: namespace:discrete.stochastic.sir1ae7b862&gt;
 ##   Locked objects: TRUE
 ##   Locked class: FALSE
 ##   Portable: TRUE</code></pre>
@@ -655,12 +663,12 @@ I_{t+1} = I_t + \beta \frac{S_t I_t}{N_t} + \epsilon - \gamma I_t
 ##     ynames: NULL
 ##     interpolate_t: NULL
 ##     cfuns: list
-##     dll: discrete.stochastic.sir.arraysd9e59c92
+##     dll: discrete.stochastic.sir.arrays729147bf
 ##     user: I_ini S_ini beta gamma nsim
 ##     registration: function () 
 ##     set_initial: function (step, y, use_dde) 
 ##     update_metadata: function () 
-##   Parent env: &lt;environment: namespace:discrete.stochastic.sir.arraysd9e59c92&gt;
+##   Parent env: &lt;environment: namespace:discrete.stochastic.sir.arrays729147bf&gt;
 ##   Locked objects: TRUE
 ##   Locked class: FALSE
 ##   Portable: TRUE</code></pre>
@@ -800,12 +808,12 @@ D_{t+1} = D_t + \gamma_D I_{D,t}
 ##     ynames: NULL
 ##     interpolate_t: NULL
 ##     cfuns: list
-##     dll: discrete.stochastic.seirdsc4e18eba
+##     dll: discrete.stochastic.seirds373126b7
 ##     user: E_ini S_ini beta delta epsilon gamma_D gamma_R mu omega
 ##     registration: function () 
 ##     set_initial: function (step, y, use_dde) 
 ##     update_metadata: function () 
-##   Parent env: &lt;environment: namespace:discrete.stochastic.seirdsc4e18eba&gt;
+##   Parent env: &lt;environment: namespace:discrete.stochastic.seirds373126b7&gt;
 ##   Locked objects: TRUE
 ##   Locked class: FALSE
 ##   Portable: TRUE</code></pre>
