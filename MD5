@@ -1,4 +1,4 @@
-2f3cdc1359bf32d254325250434051e6 *DESCRIPTION
+ebceabcb91d435fb61a3baced907968c *DESCRIPTION
 76b9e92131824362ea8de78428570bbb *LICENSE
 c9db3cba18fd8ee7366e87887d1cf15e *NAMESPACE
 82b2f621248a56b2976a40ebd012dbd8 *NEWS.md
@@ -42,17 +42,17 @@ b12495ad1f38ed6b02fe63ae3e0e6235 *R/utils.R
 0971a2684f4c3dbaba4c8e9ecc9a4e74 *R/wrapper.R
 a3eb7bff2bc66a8ef92aa48ed2348e2a *R/zzz.R
 d93d53628608adb1e67cf50576adb121 *README.md
-1fe31d7e284f55240e7f9579652d05f1 *build/vignette.rds
+faa3559c704502c62c4db66ee4216cdb *build/vignette.rds
 35b0419d95ff2ba4c19a76112a0cfa49 *inst/WORDLIST
 50bb87acea73b57b2f059d2b3385d4d8 *inst/doc/discrete.R
 ab75ec411e3314094b858cccff46ffdf *inst/doc/discrete.Rmd
-77b3db389222c8dfefccc6dc5f6fad63 *inst/doc/discrete.html
+3c23c22032c86daf12392b64eb714dce *inst/doc/discrete.html
 42f5fbf2ab160f576f440a4503a6e24b *inst/doc/functions.R
 c72925411c07726ddaebc08f8f4fa12e *inst/doc/functions.Rmd
-535603599a35e370b00fb4ed861c2490 *inst/doc/functions.html
+6dc2bdce7fcb3ef15b7347dcd08850ed *inst/doc/functions.html
 03056cf9f204bfac440eb071f24debb4 *inst/doc/odin.R
 344c63b6ebe65a02fe2f52ec61aa78be *inst/doc/odin.Rmd
-afcf32665563d55e79ee92cdb71d453e *inst/doc/odin.html
+ad1a1befb589034cf514864cc2b6640c *inst/doc/odin.html
 af0d6abdbac7ef4e1991e140202f4406 *inst/examples/discrete_deterministic_sir.R
 e360c21182d6e2704d49cd2469853334 *inst/examples/discrete_stochastic_seirds.R
 46f4e27a3a1ae36075ce57bf476ea6f3 *inst/examples/discrete_stochastic_sir.R
@@ -147,7 +147,7 @@ e4aa1f968f01a2e041dfdde92c26c0f9 *tests/testthat/test-run-delay-discrete.R
 ec736b9a398e88180a2a932b4e463744 *tests/testthat/test-run-regression.R
 3b7d0c53ad205734d08a2294279a28bd *tests/testthat/test-run-stochastic.R
 172d737655117271a6feb1bdec2d73e5 *tests/testthat/test-support.R
-36cb677b1277f4f5ebb1f9757779910a *tests/testthat/test-util.R
+f54008f3484a9da51ade2df5988102b8 *tests/testthat/test-util.R
 71470e74c673669a17fc10acbcc02e07 *tests/testthat/user_fns.R
 ded59f836ec7d7d832ac05016c4fc9ed *tests/testthat/user_fns.c
 10e95cf64830ce0d5ddd0f7bc907cb4b *tests/testthat/user_fns2.c
